@@ -1,0 +1,14 @@
+# DECISIONS — Entscheidungslog (Was · Warum · Alternative)
+
+| # | Entscheidung | Warum | Alternative |
+|---|---|---|---|
+| 1 | Eigene leichte i18n statt react-i18next | Volle Kontrolle, null Laufzeit-Fetches, typisierte Keys, kleiner Bundle | react-i18next (mehr Gewicht, mehr Magie) |
+| 2 | jsPDF statt pdfmake | Direkte Kontrolle über Layout + Font-Embedding, gut testbar | pdfmake (deklarativ, aber schwergewichtiger) |
+| 3 | Zustand + manueller Dexie-Autosave | Klare Trennung UI/State/Persistenz, einfache Migrationen | Redux Toolkit (Boilerplate), Dexie-Hooks direkt im UI |
+| 4 | Passwort-Hash via Web Crypto PBKDF2 (SHA-256, hohe Iterationszahl, Salt) | Komplett clientseitig, keine externe Lib, im Browser verfügbar | bcrypt.js (Bundle-Größe), argon2-wasm (Komplexität) |
+| 5 | Texturen primär programmatisch generiert (Canvas, deterministisch) + CC0-Slots | Build bleibt offline & deterministisch, niemals fehlendes Bild, kein flakiger Download | Nur CC0-Download (flaky, große Repos) |
+| 6 | Flächen immer live abgeleitet, nie persistiert | Keine Inkonsistenz zwischen Eingabe und gespeichertem Wert | Persistieren + Sync (Fehlerquelle) |
+| 7 | Kataloge als typisierte TS-Module, im Expertenmodus per Store-Overlay editierbar | Typsicherheit + Default-Daten versioniert, User-Änderungen separat persistiert | JSON in DB (kein Typcheck) |
+| 8 | Einheiten intern in cm/m² konsistent, Anzeige formatiert (DE-Komma) | Vermeidet NaN/Rundungsfehler; Parsing akzeptiert Komma & Punkt | Float-Meter überall (Rundungsdrift) |
+| 9 | Rundung erst am Ende der Kostenkette | Spec-Pflicht; vermeidet kumulierte Rundungsfehler | Pro Position runden (ungenau) |
+| 10 | E2E mit Playwright/Chromium, Unit mit Vitest/jsdom | Standard, schnell, gut in CI | Cypress (schwergewichtiger) |

@@ -1,0 +1,138 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Lokale Fonts (offline, kein Laufzeit-Request) ── */
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/cormorant-1.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/cormorant-2.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url('/fonts/montserrat-1.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/montserrat-2.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/montserrat-3.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/montserrat-4.woff2') format('woff2');
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-bg text-text font-sans antialiased;
+    margin: 0;
+    font-weight: 400;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-serif;
+    font-weight: 500;
+  }
+  input,
+  select,
+  textarea {
+    @apply bg-surface border border-line text-text;
+    font-family: inherit;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(201, 168, 76, 0.25);
+    border-radius: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer components {
+  .eyebrow {
+    @apply font-sans uppercase text-gold;
+    font-size: 11px;
+    letter-spacing: 0.28em;
+    font-weight: 500;
+  }
+  .hairline {
+    @apply border-line;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-sans transition-colors duration-250 border;
+    border-radius: 2px;
+  }
+  .btn-primary {
+    @apply bg-gold text-bg border-gold hover:bg-[#d8ba63];
+    font-weight: 500;
+  }
+  .btn-ghost {
+    @apply bg-transparent text-text border-line hover:border-gold hover:text-gold;
+  }
+  .btn-danger {
+    @apply bg-transparent text-danger border-danger/40 hover:bg-danger/10;
+  }
+  .card {
+    @apply bg-surface border border-line;
+    border-radius: 2px;
+  }
+  .field-label {
+    @apply block text-xs uppercase tracking-wider text-muted mb-1.5;
+    letter-spacing: 0.12em;
+  }
+  .field-input {
+    @apply w-full px-3 py-2 bg-surface-2 border border-line text-text outline-none focus:border-gold transition-colors;
+    border-radius: 2px;
+  }
+  .field-error {
+    @apply text-danger text-xs mt-1;
+  }
+  .tab {
+    @apply px-3 py-2 text-sm text-muted hover:text-text transition-colors cursor-pointer border-b-2 border-transparent;
+  }
+  .tab-active {
+    @apply text-gold border-gold;
+  }
+  .board-surface {
+    background: #f6f4ef;
+    color: #1a1814;
+  }
+}

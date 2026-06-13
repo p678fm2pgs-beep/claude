@@ -1,0 +1,10 @@
+node_modules
+dist
+.DS_Store
+*.local
+qa/test-results
+qa/playwright-report
+qa/artifacts/*.pdf
+playwright/.cache
+.vite
+node_modules/.tmp

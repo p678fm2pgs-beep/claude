@@ -1,0 +1,135 @@
+{
+  "projekt": "Musterwohnung Düsseldorf",
+  "kunde": "Familie Celik",
+  "preisstand": "06/2026",
+  "raeume": [
+    {
+      "raum": "Wohnzimmer",
+      "positionen": 22,
+      "zwischensumme": {
+        "min": 13492.140000000001,
+        "max": 19686.14
+      },
+      "zwischensummeEK": {
+        "min": 7564.919999999999,
+        "max": 11438.6
+      }
+    },
+    {
+      "raum": "Bad",
+      "positionen": 21,
+      "zwischensumme": {
+        "min": 15891.689999999999,
+        "max": 21921.69
+      },
+      "zwischensummeEK": {
+        "min": 9584.789999999999,
+        "max": 13429.59
+      }
+    },
+    {
+      "raum": "Küche",
+      "positionen": 21,
+      "zwischensumme": {
+        "min": 19385.480000000003,
+        "max": 32801.48
+      },
+      "zwischensummeEK": {
+        "min": 12174.599999999999,
+        "max": 20949.32
+      }
+    }
+  ],
+  "honorar": {
+    "min": 5852,
+    "max": 8929
+  },
+  "reserve": {
+    "min": 5462,
+    "max": 8334
+  },
+  "netto": {
+    "min": 60084,
+    "max": 91672
+  },
+  "mwst": {
+    "min": 11416,
+    "max": 17418
+  },
+  "brutto": {
+    "min": 71500,
+    "max": 109090
+  },
+  "ekGesamt": {
+    "min": 29324,
+    "max": 45818
+  },
+  "gewerke": [
+    {
+      "gewerk": "boden",
+      "min": 9210,
+      "max": 9210
+    },
+    {
+      "gewerk": "nebenposition",
+      "min": 691,
+      "max": 691
+    },
+    {
+      "gewerk": "maler",
+      "min": 5054,
+      "max": 5054
+    },
+    {
+      "gewerk": "wand",
+      "min": 6106,
+      "max": 6106
+    },
+    {
+      "gewerk": "moebel",
+      "min": 2580,
+      "max": 6600
+    },
+    {
+      "gewerk": "leuchten",
+      "min": 1200,
+      "max": 3600
+    },
+    {
+      "gewerk": "heizung",
+      "min": 3304,
+      "max": 5714
+    },
+    {
+      "gewerk": "elektro",
+      "min": 650,
+      "max": 1300
+    },
+    {
+      "gewerk": "fliesen",
+      "min": 1005,
+      "max": 1005
+    },
+    {
+      "gewerk": "sanitaer",
+      "min": 6330,
+      "max": 11250
+    },
+    {
+      "gewerk": "kueche",
+      "min": 12640,
+      "max": 23880
+    },
+    {
+      "gewerk": "honorar",
+      "min": 5852,
+      "max": 8929
+    },
+    {
+      "gewerk": "reserve",
+      "min": 5462,
+      "max": 8334
+    }
+  ],
+  "disclaimer": "Unverbindliche Kostenschätzung auf Basis hinterlegter Richtwerte. Kein Angebot. Verbindliche Preise ergeben sich aus Angeboten der ausführenden Betriebe."
+}
