@@ -1,0 +1,39 @@
+# LICENSES & Asset-Herkunft
+
+## Schriften (lokal eingebettet, offline)
+
+| Datei | Schrift | Quelle | Lizenz |
+|---|---|---|---|
+| `public/fonts/cormorant-1.woff2`, `cormorant-2.woff2` | Cormorant Garamond (500/600) | Google Fonts | SIL Open Font License 1.1 |
+| `public/fonts/montserrat-1…4.woff2` | Montserrat (300/400/500/600) | Google Fonts | SIL Open Font License 1.1 |
+
+Beide Familien stehen unter der **SIL OFL 1.1** und dürfen eingebettet und mit der Anwendung
+ausgeliefert werden. Die Dateien liegen lokal in `public/fonts/` — zur Laufzeit erfolgt kein Fetch.
+
+## Icons
+
+- **lucide-react** — ISC License. Lokal als npm-Abhängigkeit gebündelt, kein CDN.
+
+## Material-Texturen
+
+Alle Material-Texturen werden **programmatisch zur Laufzeit erzeugt** (`src/lib/texture.ts`,
+deterministisches Canvas-Rauschen/Gradient im jeweiligen Materialton). Das erfüllt die
+**Fallback-Pflicht**: Die App zeigt nie ein leeres Bild und ist nicht von externen Downloads abhängig.
+
+> **Status: Platzhalter — durch Musterfoto ersetzen.**
+> Jede der aktuell generierten Texturen ist ein hochwertiger, neutraler **Platzhalter**.
+> Für die finale Beratung sollten echte CC0-Musterfotos (z. B. von Poly Haven / ambientCG,
+> beide CC0) lokal abgelegt und je Material in `src/data/materials.ts` referenziert werden.
+> Diese Tabelle ist dann je Datei um „Quelle + Lizenz" zu ergänzen.
+
+| Material-Kategorie | Aktueller Stand | Empfohlene CC0-Quelle (optional) |
+|---|---|---|
+| Böden (Parkett, Fliesen, Naturstein, Vinyl, …) | Platzhalter (generiert) | Poly Haven / ambientCG (CC0) |
+| Wände (Putz, Tadelakt, Tapete, Paneele, …) | Platzhalter (generiert) | ambientCG (CC0) |
+| Decken | Platzhalter (generiert) | ambientCG (CC0) |
+| Textilien & Metalle | Platzhalter (generiert) | ambientCG (CC0) |
+
+## Hinweis Farbcodes
+
+RAL-Classic- und NCS-Codes in `src/data/colors.ts` sind **Annäherungen** zur Orientierung.
+Verbindlich ist ausschließlich der physische Originalfarbton bzw. das Musterstück.
