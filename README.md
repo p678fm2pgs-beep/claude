@@ -8,6 +8,15 @@ Daten sind strikt von der UI getrennt — der Schritt zu Desktop/Backend erforde
 
 ## Schnellstart
 
+### macOS — per Doppelklick (ohne Terminal)
+
+Im Finder auf **`start.command`** doppelklicken. Beim ersten Start werden die Abhängigkeiten
+automatisch installiert, danach öffnet sich die App im Browser. Voraussetzung: **Node.js**
+(https://nodejs.org, LTS) ist installiert. Falls macOS „nicht verifizierter Entwickler" meldet:
+Rechtsklick auf `start.command` → **Öffnen** → **Öffnen**.
+
+### Alle Plattformen — per Terminal
+
 ```bash
 npm install
 npm run dev           # Entwicklungsserver (Vite)
