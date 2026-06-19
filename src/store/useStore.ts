@@ -19,7 +19,7 @@ import {
   type AuthRecord,
 } from '../db/db';
 import { hashPassword, verifyPassword } from '../lib/password';
-import { createProject, createDemoProject } from '../lib/factory';
+import { createProject, createDemoProject, createShowcaseProject } from '../lib/factory';
 import { migrateProject } from '../db/migrations';
 
 type SaveState = 'idle' | 'saving' | 'saved';
@@ -54,6 +54,7 @@ interface AppState {
   deleteProjectById: (id: string) => Promise<void>;
   duplicateProject: (id: string) => Promise<void>;
   seedDemo: () => Promise<void>;
+  seedShowcase: () => Promise<void>;
   importProject: (json: string) => Promise<boolean>;
   updateProject: (mutator: (p: Project) => void) => void;
   setPriceOverride: (key: string, value: number) => Promise<void>;
@@ -194,6 +195,13 @@ export const useStore = create<AppState>((set, get) => ({
 
   async seedDemo() {
     const p = createDemoProject();
+    await saveProject(p);
+    await get().refreshProjects();
+    set({ project: p });
+  },
+
+  async seedShowcase() {
+    const p = createShowcaseProject();
     await saveProject(p);
     await get().refreshProjects();
     set({ project: p });

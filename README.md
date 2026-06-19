@@ -86,3 +86,15 @@ Lieferanten-Preisimport (CSV) · Kundenfreigabe-Link · KI-gestützte Vorschläg
 
 Das Passwort-Gate ist ein **Geräteschutz**, kein vollwertiges Login. Echtes Multi-User-Auth folgt mit
 dem Backend. Passwörter werden nur als Hash gespeichert; bei Verlust hilft ausschließlich ein Daten-Reset.
+
+## Content-Guide — Kataloge erweitern (Erweiterung 4)
+
+- **Farben:** neue Töne/Familien in `src/data/colors.ts` (`fam(...)`), Hersteller-Welten in
+  `MANUFACTURER_COLLECTIONS`. Felder: deutscher Name, HEX, RAL, NCS, LRV, Unterton.
+- **Materialien (Böden/Wände/Decken):** additive `build(...)`-Blöcke in `src/data/materials.ts`
+  (Textur-Deskriptor `{ base, variant, grain }`, technische Daten, EK/VK je Stufe, Nebenpositionen).
+- **Beleuchtung:** `src/data/lighting.ts` (`LIGHT_FIXTURES`), inkl. `voute: true` für indirekten Lichtsaum.
+- **Verlegemuster im 2D:** `src/lib/texture.ts` (`fillFloorPattern`) — rein prozedural, offline.
+- **Realistische Ansicht:** `src/components/RealisticPlan.tsx`; Umschalter im Raum-Editor
+  (Technischer Plan ⇄ Realistische Ansicht). Der technische `MiniPlan` bleibt erhalten.
+- **Regeln:** rein additiv arbeiten — `src/test/no-regression.test.ts` schützt die Baselines.

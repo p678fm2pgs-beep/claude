@@ -163,3 +163,56 @@ export function createDemoProject(): Project {
   p.modified = Date.now();
   return p;
 }
+
+/**
+ * Showcase-Demo „Musterwohnzimmer Düsseldorf" (Erweiterung 4, A9) — SEPARATES Projekt.
+ * Eiche-Fischgräte-Boden · eine schwarze Wand + eine Holzwand · Fenster mit schwarzem Rahmen ·
+ * indirekte Deckenvoute. Zum Vorführen der realistischen 2D-Ansicht.
+ * (Additiv — lässt das bestehende Demo-Projekt mit 3 Räumen unangetastet.)
+ */
+export function createShowcaseProject(): Project {
+  const p = createProject('Musterwohnzimmer Düsseldorf');
+  p.customer = 'HAVEN Showcase';
+  p.address = 'Königsallee, 40212 Düsseldorf';
+
+  const room = createRoom('Wohnzimmer', 'wohnzimmer', 600, 440, 270);
+  room.light = { orientation: 'S', daylight: 'viel' };
+  room.stylePreset = 'quiet-luxury';
+  // Fenster mit schwarzem Rahmen + Tür
+  room.floorplan.openings = [
+    { id: uid('op'), kind: 'fenster', wallIndex: 0, offsetCm: 120, widthCm: 240, heightCm: 160, sillCm: 40, frameColor: '#141414' },
+    { id: uid('op'), kind: 'fenster', wallIndex: 0, offsetCm: 400, widthCm: 120, heightCm: 160, sillCm: 40, frameColor: '#141414' },
+    { id: uid('op'), kind: 'tuer', wallIndex: 2, offsetCm: 150, widthCm: 100, heightCm: 210, sillCm: 0 },
+  ];
+
+  const v = room.variants[0];
+  v.name = 'Eiche & Schwarz';
+  v.colorRoles = { wand: 'weiss-4', decke: 'weiss-1', boden: 'braun-3', akzent: 'schwarz-1', textil: 'creme-5' };
+  // Wand 0 schwarz, Wand 2 Holzoptik (über Wandmaterial)
+  v.wallColors = { 0: 'schwarz-1' };
+  v.materials = [
+    { id: uid('ms'), materialId: 'parkett-eiche-fischgraet', surface: 'boden', tier: 'luxus', pattern: 'fischgraet', layingDirection: 'laengs', woodSpecies: 'eiche-geraeuchert', finish: 'geraeuchert' },
+    { id: uid('ms'), materialId: 'wandfarbe-matt', surface: 'wand', tier: 'premium' },
+    { id: uid('ms'), materialId: 'holz-lamellen', surface: 'wand', tier: 'premium', wallIndex: 2 },
+    { id: uid('ms'), materialId: 'decke-anstrich', surface: 'decke', tier: 'standard' },
+    { id: uid('ms'), materialId: 'textil-boucle', surface: 'sonstiges', tier: 'premium' },
+    { id: uid('ms'), materialId: 'metall-schwarz-matt', surface: 'sonstiges', tier: 'premium' },
+  ];
+  v.furniture = [
+    { id: uid('fi'), typeId: 'sofa', label: 'Sofa', tier: 'luxus', quantity: 1, unit: 'Stk' },
+    { id: uid('fi'), typeId: 'couchtisch', label: 'Couchtisch', tier: 'premium', quantity: 1, unit: 'Stk' },
+    { id: uid('fi'), typeId: 'teppich', label: 'Teppich', tier: 'premium', quantity: 1, unit: 'Stk' },
+  ];
+  v.trades = [{ id: uid('ts'), tradeId: 'fbh', tier: 'premium', quantity: 1 }];
+  // Indirekte Deckenvoute (umlaufend) + Einbau-Spots
+  v.lights = [
+    { id: uid('ls'), fixtureId: 'lichtvoute', tier: 'premium', quantity: 0, kelvin: 2700, profile: 'vouten-profil' },
+    { id: uid('ls'), fixtureId: 'einbauspot-rund', tier: 'premium', quantity: 6, kelvin: 3000 },
+  ];
+  v.lighting = [{ id: uid('ls'), name: 'Abendstimmung', kelvin: 2700, dimmable: true, types: ['Lichtvoute', 'Einbauspot'] }];
+  v.notes = 'Realistische 2D-Ansicht: Eiche-Fischgräte, schwarze Fensterwand, Holzwand, warme Voute.';
+
+  p.rooms = [room];
+  p.modified = Date.now();
+  return p;
+}

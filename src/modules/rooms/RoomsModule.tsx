@@ -3,7 +3,8 @@ import { useStore } from '../../store/useStore';
 import { useT } from '../../hooks';
 import { PageHeader, EmptyState, Field, Badge } from '../../components/ui';
 import { MiniPlan } from '../../components/MiniPlan';
-import { getRoom } from '../roomHelpers';
+import { getRoom, getActiveVariant } from '../roomHelpers';
+import { RealisticPlan } from '../../components/RealisticPlan';
 import { createRoom } from '../../lib/factory';
 import { uid } from '../../lib/id';
 import { deriveAreas, rectanglePoints, lShapePoints, wallLengthCm, CM_PER_M } from '../../lib/geometry';
@@ -216,6 +217,7 @@ function RoomEditor({
   const [depthStr, setDepthStr] = useState(((Math.max(...room.floorplan.points.map((p) => p.y)) - Math.min(...room.floorplan.points.map((p) => p.y))) / CM_PER_M).toFixed(2));
   const [heightStr, setHeightStr] = useState((room.heightCm / CM_PER_M).toFixed(2));
   const [heightErr, setHeightErr] = useState<string | undefined>();
+  const [planView, setPlanView] = useState<'technisch' | 'realistisch'>('technisch');
 
   const applyRectangle = () => {
     const w = parseLocaleNumber(widthStr);
@@ -267,12 +269,29 @@ function RoomEditor({
   };
 
   const wallCount = room.floorplan.points.length;
+  const variant = getActiveVariant(room);
 
   return (
     <div className="grid lg:grid-cols-[1fr_360px] gap-6" data-testid="room-editor">
       {/* Plan + Maßstab */}
       <div className="card p-4">
         <div className="flex items-center justify-between mb-3">
+          <div className="flex gap-1" data-testid="plan-view-toggle">
+            <button
+              className={`px-2.5 py-1 text-xs border rounded ${planView === 'technisch' ? 'border-gold text-gold' : 'border-line text-muted'}`}
+              onClick={() => setPlanView('technisch')}
+              data-testid="plan-technisch"
+            >
+              {t('plan.technical')}
+            </button>
+            <button
+              className={`px-2.5 py-1 text-xs border rounded ${planView === 'realistisch' ? 'border-gold text-gold' : 'border-line text-muted'}`}
+              onClick={() => setPlanView('realistisch')}
+              data-testid="plan-realistisch"
+            >
+              {t('plan.realistic')}
+            </button>
+          </div>
           <span className="eyebrow">{t('rooms.title')}</span>
           <div className="flex gap-1">
             <button className="btn btn-ghost px-2 py-1" onClick={undo} disabled={!canUndo} title={t('rooms.undo')} data-testid="undo">
@@ -284,7 +303,11 @@ function RoomEditor({
           </div>
         </div>
         <div className="board-surface rounded p-3">
-          <MiniPlan plan={room.floorplan} heightCm={room.heightCm} width={560} height={360} showDimensions />
+          {planView === 'realistisch' && variant ? (
+            <RealisticPlan room={room} variant={variant} width={560} height={360} showDimensions />
+          ) : (
+            <MiniPlan plan={room.floorplan} heightCm={room.heightCm} width={560} height={360} showDimensions />
+          )}
           <div className="flex items-center gap-2 mt-2 text-[#6b6256] text-xs">
             <div className="h-px bg-[#1A1814] w-12" />
             <span>1,00 m</span>

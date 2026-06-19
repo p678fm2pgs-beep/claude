@@ -192,7 +192,155 @@ export const COLOR_FAMILIES: ColorFamily[] = [
     ['Apricot-Puder', 'Apricot Powder', '#E6C4AE', 'RAL 1015', 'S 1515-Y50R', 62, 'warm'],
     ['Beerenrosé', 'Berry Rose', '#B98592', 'RAL 3014', 'S 3020-R10B', 35, 'kuehl'],
   ]),
+  // ── Erweiterung 4: zusätzliche Familien (rein additiv) ──
+  fam('hellgrau', 'Hellgrau', 'Light Grey', [
+    ['Porzellangrau', 'Porcelain Grey', '#E2E2E0', 'RAL 7047', 'S 1500-N', 76, 'neutral'],
+    ['Wolkengrau', 'Cloud Grey', '#D9D9D6', 'RAL 7035', 'S 2000-N', 70, 'kuehl'],
+    ['Federgrau', 'Feather Grey', '#CDD0CF', 'RAL 7038', 'S 2002-B', 63, 'kuehl'],
+    ['Kalkgrau', 'Lime Grey', '#D2CFC7', 'RAL 7044', 'S 2005-Y', 64, 'warm'],
+    ['Silbergrau', 'Silver Grey', '#C7C9C8', 'RAL 7001', 'S 2500-N', 58, 'kuehl'],
+    ['Mondgrau', 'Moon Grey', '#DADBD8', 'RAL 7035', 'S 1502-G', 71, 'neutral'],
+    ['Aschgrau-Hell', 'Light Ash Grey', '#C2C2BD', 'RAL 7032', 'S 3000-N', 55, 'neutral'],
+    ['Opalgrau', 'Opal Grey', '#CFD2D1', 'RAL 7038', 'S 2502-B', 62, 'kuehl'],
+    ['Zinkgrau', 'Zinc Grey', '#BFC1C0', 'RAL 7037', 'S 3000-N', 54, 'kuehl'],
+    ['Leinengrau-Hell', 'Light Linen Grey', '#D6D3CB', 'RAL 7044', 'S 2002-Y', 66, 'warm'],
+  ]),
+  fam('taupe', 'Taupe', 'Taupe', [
+    ['Taupe Hell', 'Light Taupe', '#C3B8A8', 'RAL 1019', 'S 3010-Y20R', 52, 'warm'],
+    ['Taupe', 'Taupe', '#A99A88', 'RAL 7006', 'S 4010-Y20R', 40, 'warm'],
+    ['Taupe Dunkel', 'Dark Taupe', '#8C7E6E', 'RAL 7006', 'S 5010-Y10R', 28, 'warm'],
+    ['Maulwurf', 'Mole', '#7E7468', 'RAL 7048', 'S 5005-Y20R', 24, 'neutral'],
+    ['Schlamm', 'Mud', '#9B8E7B', 'RAL 1035', 'S 4010-Y20R', 34, 'warm'],
+    ['Nougat', 'Nougat', '#B6A48C', 'RAL 1019', 'S 3020-Y20R', 45, 'warm'],
+    ['Rauchtaupe', 'Smoke Taupe', '#9A9082', 'RAL 7048', 'S 4005-Y20R', 33, 'neutral'],
+    ['Steintaupe', 'Stone Taupe', '#AEA293', 'RAL 7032', 'S 3505-Y20R', 41, 'warm'],
+    ['Pilztaupe', 'Mushroom Taupe', '#B3A797', 'RAL 1019', 'S 3510-Y20R', 43, 'warm'],
+    ['Asche-Taupe', 'Ash Taupe', '#928A7E', 'RAL 7048', 'S 4505-Y20R', 30, 'neutral'],
+  ]),
+  fam('schwarz', 'Schwarz', 'Black', [
+    ['Reinschwarz', 'Pure Black', '#171717', 'RAL 9005', 'S 9000-N', 2, 'neutral'],
+    ['Samtschwarz', 'Velvet Black', '#1B1B1B', 'RAL 9005', 'S 9000-N', 2, 'neutral'],
+    ['Kohlschwarz', 'Coal Black', '#212121', 'RAL 9011', 'S 8500-N', 3, 'neutral'],
+    ['Tiefseeschwarz', 'Deep Sea Black', '#1A1F22', 'RAL 5004', 'S 8505-B20G', 3, 'kuehl'],
+    ['Espressoschwarz', 'Espresso Black', '#231D18', 'RAL 8022', 'S 8505-Y20R', 3, 'warm'],
+    ['Grafitschwarz', 'Graphite Black', '#262626', 'RAL 9011', 'S 8500-N', 4, 'neutral'],
+    ['Onyxschwarz', 'Onyx Black', '#1C1B1A', 'RAL 9005', 'S 9000-N', 2, 'neutral'],
+    ['Vantaschwarz', 'Matte Pure Black', '#141414', 'RAL 9005', 'S 9000-N', 2, 'neutral'],
+    ['Basaltschwarz', 'Basalt Black', '#222523', 'RAL 7021', 'S 8502-G', 3, 'kuehl'],
+    ['Teerschwarz', 'Tar Black', '#1F1D1B', 'RAL 9005', 'S 9000-N', 2, 'warm'],
+  ]),
+  fam('tuerkis', 'Türkis / Aqua', 'Turquoise / Aqua', [
+    ['Türkis', 'Turquoise', '#3F8E8A', 'RAL 5018', 'S 3040-B50G', 28, 'kuehl'],
+    ['Aqua', 'Aqua', '#7FB4B0', 'RAL 6027', 'S 2030-B50G', 44, 'kuehl'],
+    ['Mintgrün', 'Mint', '#A9CFC4', 'RAL 6034', 'S 1520-B70G', 58, 'kuehl'],
+    ['Lagune', 'Lagoon', '#2F7E80', 'RAL 5021', 'S 4040-B30G', 22, 'kuehl'],
+    ['Smaragd-Aqua', 'Emerald Aqua', '#2E6E63', 'RAL 6016', 'S 5030-B70G', 18, 'kuehl'],
+    ['Eisminze', 'Ice Mint', '#C6E0D8', 'RAL 6019', 'S 1010-B90G', 68, 'kuehl'],
+    ['Petrolaqua', 'Petrol Aqua', '#356E72', 'RAL 5020', 'S 5030-B30G', 20, 'kuehl'],
+    ['Seegrün', 'Sea Green', '#5E9B8F', 'RAL 6033', 'S 3030-B70G', 36, 'kuehl'],
+    ['Türkisgrau', 'Turquoise Grey', '#7E9E9A', 'RAL 6027', 'S 3010-B50G', 40, 'kuehl'],
+    ['Tiefes Aqua', 'Deep Aqua', '#23606A', 'RAL 5021', 'S 5040-B20G', 16, 'kuehl'],
+  ]),
+  fam('lavendel', 'Lavendel / Flieder', 'Lavender / Lilac', [
+    ['Lavendel', 'Lavender', '#B0A6C4', 'RAL 4005', 'S 2020-R50B', 44, 'kuehl'],
+    ['Flieder', 'Lilac', '#C3B4D0', 'RAL 4009', 'S 2010-R50B', 52, 'kuehl'],
+    ['Mauve-Violett', 'Mauve Violet', '#9C8FAE', 'RAL 4011', 'S 3020-R50B', 36, 'kuehl'],
+    ['Glyzinie', 'Wisteria', '#A99BC0', 'RAL 4005', 'S 2520-R50B', 41, 'kuehl'],
+    ['Pudriges Veilchen', 'Powder Violet', '#CFC4DA', 'RAL 4009', 'S 1510-R50B', 60, 'kuehl'],
+    ['Heidelila', 'Heather', '#8E7E9C', 'RAL 4012', 'S 4020-R50B', 30, 'kuehl'],
+    ['Graulavendel', 'Grey Lavender', '#ABA6B6', 'RAL 4009', 'S 2510-R50B', 45, 'neutral'],
+    ['Amethyst-Gedeckt', 'Muted Amethyst', '#8B7BA0', 'RAL 4011', 'S 4030-R50B', 28, 'kuehl'],
+    ['Blaulavendel', 'Blue Lavender', '#9AA0C2', 'RAL 4005', 'S 2520-R60B', 42, 'kuehl'],
+    ['Mauverosé', 'Mauve Rose', '#B7A3B4', 'RAL 4009', 'S 2515-R40B', 46, 'kuehl'],
+  ]),
 ];
+
+/**
+ * HERSTELLER-FARBWELTEN (Erweiterung 4) — klar gekennzeichnete Sammlungen.
+ * „Farbton-Annäherung — verbindlich nur der Original-Farbfächer des Herstellers."
+ */
+export interface ManufacturerColor {
+  id: string;
+  name: string;
+  code: string;
+  hex: string;
+  ral: string;
+  lrv: number;
+  undertone: Untertone;
+}
+export interface ManufacturerCollection {
+  id: string;
+  manufacturer: string;
+  colors: ManufacturerColor[];
+}
+
+function mc(prefix: string, rows: [string, string, string, string, number, Untertone][]): ManufacturerColor[] {
+  return rows.map((r, i) => ({
+    id: `${prefix}-${i + 1}`,
+    name: r[0],
+    code: r[1],
+    hex: r[2],
+    ral: r[3],
+    lrv: r[4],
+    undertone: r[5],
+  }));
+}
+
+export const MANUFACTURER_COLLECTIONS: ManufacturerCollection[] = [
+  {
+    id: 'farrow-ball',
+    manufacturer: 'Farrow & Ball',
+    colors: mc('fb', [
+      ['Wevet', 'No. 273', '#EFEDE6', 'RAL 9010', 86, 'neutral'],
+      ['Cornforth White', 'No. 228', '#D6D2CA', 'RAL 7047', 66, 'neutral'],
+      ['Hague Blue', 'No. 30', '#323A41', 'RAL 5008', 7, 'kuehl'],
+      ['Stiffkey Blue', 'No. 281', '#3C434E', 'RAL 5011', 8, 'kuehl'],
+      ['Card Room Green', 'No. 79', '#7B7E70', 'RAL 7009', 26, 'neutral'],
+      ['Setting Plaster', 'No. 231', '#E2C7B8', 'RAL 3012', 60, 'warm'],
+      ['Railings', 'No. 31', '#33363A', 'RAL 7021', 5, 'kuehl'],
+    ]),
+  },
+  {
+    id: 'little-greene',
+    manufacturer: 'Little Greene',
+    colors: mc('lg', [
+      ['French Grey', 'No. 113', '#C5BFAE', 'RAL 7032', 56, 'warm'],
+      ['Shirting', 'No. 129', '#EDE9DD', 'RAL 9001', 82, 'warm'],
+      ['Lamp Black', 'No. 228', '#2A2A28', 'RAL 9005', 3, 'neutral'],
+      ['Pleat', 'No. 280', '#D9CFC0', 'RAL 1013', 64, 'warm'],
+      ['Jewel Beetle', 'No. 314', '#2F5A4E', 'RAL 6004', 14, 'kuehl'],
+      ['Hicks Blue', 'No. 208', '#46698A', 'RAL 5007', 22, 'kuehl'],
+    ]),
+  },
+  {
+    id: 'caparol',
+    manufacturer: 'Caparol',
+    colors: mc('cap', [
+      ['Cuban Beige', '15', '#D8C8AE', 'RAL 1015', 62, 'warm'],
+      ['Schiefergrau', '85', '#5C6266', 'RAL 7015', 14, 'kuehl'],
+      ['Salbei', '120', '#A6AE96', 'RAL 6021', 46, 'neutral'],
+      ['Cremeweiß', '04', '#EDE6D6', 'RAL 9001', 80, 'warm'],
+      ['Anthrazitgrau', '90', '#3A3D40', 'RAL 7016', 6, 'kuehl'],
+      ['Terracotta', '55', '#B96A4C', 'RAL 8004', 28, 'warm'],
+    ]),
+  },
+  {
+    id: 'alpina',
+    manufacturer: 'Alpina',
+    colors: mc('alp', [
+      ['Edelweiß', 'Weiß', '#F2EFE8', 'RAL 9010', 85, 'neutral'],
+      ['Sanftes Greige', 'Greige', '#CBC2B2', 'RAL 7044', 58, 'warm'],
+      ['Ruhiges Grau', 'Grau', '#B5B5B1', 'RAL 7035', 50, 'neutral'],
+      ['Tiefes Petrol', 'Petrol', '#2E5961', 'RAL 5020', 12, 'kuehl'],
+      ['Warmes Sand', 'Sand', '#DBC9A8', 'RAL 1014', 64, 'warm'],
+      ['Olivton', 'Oliv', '#73754F', 'RAL 6013', 22, 'warm'],
+    ]),
+  },
+];
+
+export const ALL_MANUFACTURER_COLORS: ManufacturerColor[] = MANUFACTURER_COLLECTIONS.flatMap(
+  (c) => c.colors,
+);
 
 export const ALL_TONES: ColorTone[] = COLOR_FAMILIES.flatMap((f) => f.tones);
 

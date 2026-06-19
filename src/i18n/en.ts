@@ -83,6 +83,7 @@ export const en: Record<string, string> = {
   'projects.modified': 'Modified',
   'projects.deleteConfirm': 'Really delete this project?',
   'projects.seedDemo': 'Load demo “Musterwohnung Düsseldorf”',
+  'projects.seedShowcase': 'Load showcase “Musterwohnzimmer” (realistic 2D)',
 
   'rooms.title': 'Rooms',
   'rooms.empty': 'No rooms yet — start with your first room.',
@@ -108,6 +109,14 @@ export const en: Record<string, string> = {
   'rooms.redo': 'Redo',
   'rooms.duplicate': 'Duplicate room',
   'rooms.wallLength': 'Wall length',
+  'plan.technical': 'Technical plan',
+  'plan.realistic': 'Realistic view',
+
+  // Lighting (Extension 4)
+  'lighting.title': 'Lighting',
+  'lighting.add': 'Add fixture',
+  'lighting.kelvin': 'Light color',
+  'lighting.empty': 'No lighting selected yet.',
 
   'roomType.wohnzimmer': 'Living room',
   'roomType.esszimmer': 'Dining room',

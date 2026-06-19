@@ -5,6 +5,7 @@ import { PageHeader, EmptyState } from '../../components/ui';
 import { getRoom, getActiveVariant } from '../roomHelpers';
 import { furnitureForRoom, findFurnitureType } from '../../data/furniture';
 import { tradesForRoom, findTrade } from '../../data/prices';
+import { fixturesForRoom, findFixture, KELVIN_OPTIONS } from '../../data/lighting';
 import { formatEUR } from '../../lib/format';
 import { uid } from '../../lib/id';
 import type { PriceTier } from '../../types';
@@ -44,8 +45,19 @@ export function FurnitureModule({ roomId }: { roomId: string }) {
     mutate((v) => v.trades.push({ id: uid('ts'), tradeId, tier: 'premium', quantity: 1 }));
   };
 
+  const addLight = (fixtureId: string) => {
+    const fx = findFixture(fixtureId);
+    if (!fx) return;
+    mutate((v) => {
+      v.lights = v.lights ?? [];
+      v.lights.push({ id: uid('ls'), fixtureId, tier: 'premium', quantity: fx.unit === 'lfm' ? 0 : 1, kelvin: fx.kelvin });
+    });
+  };
+
   const suggestions = furnitureForRoom(room.type);
   const trades = tradesForRoom(room.type);
+  const fixtures = fixturesForRoom(room.type);
+  const lights = variant.lights ?? [];
 
   return (
     <div className="p-6 lg:p-8">
@@ -145,6 +157,70 @@ export function FurnitureModule({ roomId }: { roomId: string }) {
             </div>
           )}
         </>
+      )}
+
+      {/* Beleuchtung (Erweiterung 4) */}
+      <p className="eyebrow mb-3 mt-8">{t('lighting.title')}</p>
+      <div className="flex flex-wrap gap-2 mb-4" data-testid="lighting-suggestions">
+        {fixtures.map((fx) => (
+          <button
+            key={fx.id}
+            className="px-3 py-1.5 text-sm border border-line rounded text-muted hover:text-gold hover:border-gold/40"
+            onClick={() => addLight(fx.id)}
+            data-testid={`add-light-${fx.id}`}
+          >
+            <Plus size={12} className="inline mr-1" />
+            {lang === 'de' ? fx.name : fx.nameEn}
+          </button>
+        ))}
+      </div>
+      {lights.length === 0 ? (
+        <p className="text-muted text-sm">{t('lighting.empty')}</p>
+      ) : (
+        <div className="space-y-2" data-testid="lighting-list">
+          {lights.map((ls) => {
+            const fx = findFixture(ls.fixtureId);
+            if (!fx) return null;
+            const range = fx.price[ls.tier];
+            const qtyForCalc = ls.quantity > 0 ? ls.quantity : 1;
+            return (
+              <div key={ls.id} className="card p-3 flex items-center gap-3 flex-wrap">
+                <span className="flex-1 min-w-[140px] text-sm">
+                  {lang === 'de' ? fx.name : fx.nameEn}
+                  <span className="text-muted text-xs"> · {fx.lumen} lm · {fx.watt} W · {fx.ip}</span>
+                </span>
+                <input
+                  type="number"
+                  min={0}
+                  className="field-input w-20 text-sm"
+                  value={ls.quantity}
+                  onChange={(e) => mutate((v) => { const x = (v.lights ?? []).find((y) => y.id === ls.id); if (x) x.quantity = Math.max(0, parseInt(e.target.value) || 0); })}
+                  data-testid="light-qty"
+                />
+                <span className="text-muted text-xs w-10">{fx.unit}</span>
+                <select
+                  className="field-input w-24 text-sm"
+                  value={ls.kelvin ?? fx.kelvin}
+                  onChange={(e) => mutate((v) => { const x = (v.lights ?? []).find((y) => y.id === ls.id); if (x) x.kelvin = parseInt(e.target.value); })}
+                  aria-label={t('lighting.kelvin')}
+                >
+                  {KELVIN_OPTIONS.map((k) => (
+                    <option key={k} value={k}>{k}K</option>
+                  ))}
+                </select>
+                <select className="field-input w-28 text-sm" value={ls.tier} onChange={(e) => mutate((v) => { const x = (v.lights ?? []).find((y) => y.id === ls.id); if (x) x.tier = e.target.value as PriceTier; })}>
+                  {(['standard', 'premium', 'luxus'] as PriceTier[]).map((tier) => (
+                    <option key={tier} value={tier}>{t(`common.tier.${tier}`)}</option>
+                  ))}
+                </select>
+                <span className="text-sm w-40 text-right">{formatEUR(range[0] * qtyForCalc, lang)} – {formatEUR(range[1] * qtyForCalc, lang)}</span>
+                <button className="text-muted hover:text-danger" onClick={() => mutate((v) => { v.lights = (v.lights ?? []).filter((y) => y.id !== ls.id); })}>
+                  <X size={16} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );

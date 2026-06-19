@@ -128,3 +128,48 @@ Anzeige mit DE-Komma.
 Echtes Multi-User-Login & Cloud-Sync (Backend) · Tauri-Desktop-Build · eigene Musterfoto-Bibliothek ·
 Lieferanten-Preisimport (CSV) · Kundenfreigabe-Link · KI-gestützte Farb-/Material-Vorschläge ·
 vollständige zeilenweise Preislisten-Overrides · Cormorant-Embedding im PDF.
+
+---
+
+# Erweiterung 4 — Katalog- & 2D-Visualisierungs-Ausbau (rein additiv)
+
+## Mengen-Übersicht (Vorher → Nachher)
+| Kategorie | Vorher | Nachher | Δ |
+|---|---|---|---|
+| Farbtöne | 120 | **170** | +50 |
+| Farbfamilien | 12 | **17** | +5 |
+| Hersteller-Farben (neu) | 0 | **25** | +25 (Farrow & Ball, Little Greene, Caparol, Alpina) |
+| Materialien | 63 | **85** | +22 (Böden, Wände, Fliesenformate) |
+| Beleuchtung (neue Kategorie) | 0 | **15** | +15 (inkl. indirekte Voute) |
+
+Kein Katalog wurde kleiner; alle Stichproben (Reinweiß #F4F4F2, Anthrazit RAL 7016, Eiche
+Landhausdiele 79 € VK …) sind unverändert — maschinell belegt durch `src/test/no-regression.test.ts`.
+
+## 2D-Visualisierung — Vorher/Nachher
+- **Vorher:** nur technischer Plan (`MiniPlan`, Linien + Maße).
+- **Nachher (additiv):** Umschalter **Technischer Plan ⇄ Realistische Ansicht**. Die realistische
+  Ansicht (`RealisticPlan`) füllt den Boden mit Material-Textur **inkl. Verlegemuster**
+  (Fischgräte/Chevron/Diele/Würfel/Diagonal, Fliesenraster mit Fugenfarbe, Verlegerichtung),
+  zeichnet **jede Wand in ihrer Farbe/ihrem Material** (z. B. eine schwarze Wand), **Tür-Öffnungsbogen**
+  und **Fenster-Mehrfachlinie mit Rahmenfarbe** (schwarze Rahmen), sowie einen **dezenten Voute-Lichtsaum**.
+  Der technische Plan bleibt unverändert erhalten.
+
+## Datenmodell (Zwei-Ebenen, additiv)
+schemaVersion **3**; alle neuen Felder optional (`LayingPattern`, `LayingDirection`, `Finish`,
+`woodSpecies`, `format`, `groutColor`, `Opening.frameColor`, `Variant.wallColors`, `Variant.lights`).
+Migration v2→v3 stamp-only → **Altprojekte bleiben gültig und rechnen unverändert** (Test belegt).
+
+## Definition of Done — Abgleich (Erweiterung 4)
+`npm run verify` GRÜN · no-regression GRÜN · Böden inkl. Holzarten/Finishes/Verlegemuster
+(Fischgräte/Chevron) + 2D-Muster ✅ · Fliesenformate/Fugen ✅ · Wände pro Wand farbig in 2D ✅ ·
++50 Farben & Hersteller-Farbwelten ✅ · Beleuchtung inkl. Voute + Lichtsaum ✅ · prozedurale Texturen,
+kein Lego-Look, Fallback dezent ✅ · Umschalter technisch ⇄ realistisch ✅ · jeder neue Eintrag mit
+technischen Daten + EK/VK in der Kalkulation ✅ · offline ✅ · Demo/Showcase-Raum ✅ · QA-REPORT/DECISIONS
+aktualisiert ✅.
+
+## Bekannte Grenzen / Roadmap (Erweiterung 4)
+- Texturen weiterhin prozedurale Platzhalter (erkennbar, aber nicht fotorealistisch) → CC0-Albedo-Fotos
+  als nächster Schritt; Fischgräte ist stilisiert (±45°-Dielen mit Basisfüllung, keine Lücken).
+- Browsergebundene Screenshot-Galerie/E2E weiterhin nur in Umgebungen mit Browser ausführbar
+  (`e2e/realistic.spec.ts` vorhanden).
+- Roadmap: mehr Fototexturen, Pipette/Custom-HEX an Wänden, spätere 3D-Verknüpfung.

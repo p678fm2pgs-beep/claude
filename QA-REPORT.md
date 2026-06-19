@@ -38,3 +38,27 @@ Selbstreparatur-Schleife nach jedem Meilenstein bis GRÜN.
 
 Browsergebundene E2E + Screenshot-Galerie sind in dieser Sandbox nicht ausführbar (Browser-Download
 gesperrt, `BLOCKER.md` B1). Die Specs sind vollständig vorhanden und laufen in jeder Umgebung mit Browser.
+
+---
+
+## Erweiterung 4 — Protokoll (rein additiv, Regressionsschutz aktiv)
+
+Schutzschild `src/test/no-regression.test.ts` lief nach jedem Schritt GRÜN (Baselines unverändert
+unterschritten: nie). Backup-Tag `backup-vor-erweiterung4`.
+
+| Schritt | Inhalt | verify | no-regression |
+|---|---|---|---|
+| A0 | Backup, Baseline-Zählung, Regressionsschutz-Test, Zwei-Ebenen-Datenmodell (schemaVersion 3, Migration) | ✅ | ✅ |
+| A1/A3 | Böden + Holzarten/Finishes + Fliesenformate (additiv, +22 Materialien) | ✅ | ✅ |
+| A4 | Wände + Tapeten (additiv, in den +22 enthalten) | ✅ | ✅ |
+| A5 | Farben +50 Töne (5 neue Familien) + 4 Hersteller-Farbwelten (25 Töne) | ✅ | ✅ |
+| A6 | Beleuchtungs-Katalog (15 Leuchten) + Profile + Kelvin; Kalkulations-Integration | ✅ | ✅ |
+| A2/A8 | Verlegemuster-Rendering (Diele/Fischgräte/Chevron/Würfel/Diagonal) + Fliesenraster/Fugen; `RealisticPlan` mit Wandfarben, Tür-/Fenster-Symbolen (+ Rahmenfarbe), Voute-Lichtsaum; Umschalter technisch ⇄ realistisch | ✅ | ✅ |
+| A9 | Showcase „Musterwohnzimmer Düsseldorf" (Eiche-Fischgräte, schwarze Wand, Holzwand, schwarze Fensterrahmen, Voute) + Tests | ✅ | ✅ |
+
+**Selbstreparaturen:** bestehender Katalog-Test (`=== 12 Familien`) auf `≥ 12` umgestellt (additive
+Wachstums-Semantik); neue Familien von 8 auf je 10 Töne ergänzt, um die „≥10 je Familie"-Invariante zu
+wahren; Integrationstest auf den Editor-Scope eingegrenzt (mehrfache `floorplan-svg`).
+
+**Teststand nach Erweiterung 4:** 112 Vitest-Tests grün (inkl. 13 no-regression + 7 ext4 + Integration
+realistische Ansicht). E2E-Specs `e2e/realistic.spec.ts` ergänzt (browsergebunden).

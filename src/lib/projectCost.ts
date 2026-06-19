@@ -26,6 +26,7 @@ import { findMaterial, type Material } from '../data/materials';
 import { findAddon, type Addon } from '../data/addons';
 import { findFurnitureType } from '../data/furniture';
 import { findTrade } from '../data/prices';
+import { findFixture } from '../data/lighting';
 import {
   PAINT_PRICES,
   PAINT_COATS,
@@ -182,6 +183,29 @@ export function computeRoomCost(room: Room, coverage: number): RoomCost {
       ekMin: ekVon * qty,
       ekMax: ekBis * qty,
       tier: ts.tier,
+    });
+  }
+
+  // Beleuchtung (Erweiterung 4) — additiv. Voute/Profile lfm-basiert, sonst Stückzahl.
+  for (const ls of variant?.lights ?? []) {
+    const fx = findFixture(ls.fixtureId);
+    if (!fx) continue;
+    const [von, bis] = fx.price[ls.tier];
+    // Für laufende Meter ohne Eingabe: Raumumfang als sinnvoller Default (z. B. umlaufende Voute).
+    const qty = ls.quantity > 0 ? ls.quantity : fx.unit === 'lfm' ? round2(areas.perimeter) : 1;
+    lines.push({
+      id: lineId(),
+      label: fx.name,
+      gewerk: 'leuchten',
+      qty: round2(qty),
+      unit: fx.unit,
+      unitMin: von,
+      unitMax: bis,
+      totalMin: von * qty,
+      totalMax: bis * qty,
+      ekMin: von * qty * fx.ekFactor,
+      ekMax: bis * qty * fx.ekFactor,
+      tier: ls.tier,
     });
   }
 

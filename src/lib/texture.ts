@@ -206,6 +206,256 @@ const TEXTURE_PAINTERS: Record<TextureVariant, Painter> = {
   },
 };
 
+// ─────────────────────────────────────────────────────────────
+// Erweiterung 4: maßstäbliches Verlegemuster-Rendering (additiv).
+// Zeichnet das Bodenmuster in den aktuellen Clip (Raumpolygon) des Kontexts.
+// Alles prozedural & offline; Basisfarbe füllt dahinter → niemals leer/Lego.
+// ─────────────────────────────────────────────────────────────
+
+export interface FloorPatternOptions {
+  pattern: string; // LayingPattern
+  direction?: 'laengs' | 'quer' | 'diagonal';
+  base: string;
+  grain: string;
+  /** Fliesenraster statt Holz (Material mit variant 'tile'/'stone'). */
+  tile?: boolean;
+  groutColor?: string;
+  /** Kantenlänge eines Elements in Metern (Diele-Länge bzw. Fliesenformat). */
+  unitM?: number;
+}
+
+function withShade(hex: string, amt: number): string {
+  const { r, g, b } = hexToRgb(hex);
+  return rgbToHex({ r: r + amt, g: g + amt, b: b + amt });
+}
+
+/** Eine Diele/ein Element als gefülltes (ggf. rotiertes) Rechteck mit Maserung. */
+function plank(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  lenPx: number,
+  widPx: number,
+  angle: number,
+  base: string,
+  grain: string,
+  rand: () => number,
+): void {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
+  ctx.fillStyle = withShade(base, (rand() - 0.5) * 16);
+  ctx.fillRect(-lenPx / 2, -widPx / 2, lenPx, widPx);
+  // Maserung
+  ctx.strokeStyle = withShade(grain, -6);
+  ctx.globalAlpha = 0.18;
+  ctx.lineWidth = 1;
+  const lines = Math.max(1, Math.round(widPx / 6));
+  for (let i = 0; i < lines; i++) {
+    const y = -widPx / 2 + (i + 0.5) * (widPx / lines) + (rand() - 0.5) * 2;
+    ctx.beginPath();
+    ctx.moveTo(-lenPx / 2, y);
+    ctx.lineTo(lenPx / 2, y);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  // Fuge/Kante
+  ctx.strokeStyle = withShade(base, -34);
+  ctx.lineWidth = 1;
+  ctx.strokeRect(-lenPx / 2, -widPx / 2, lenPx, widPx);
+  ctx.restore();
+}
+
+/**
+ * Füllt den aktuellen Clip mit dem Bodenmuster.
+ * bbox in Geräte-px, pxPerM = Pixel pro Meter (Maßstab).
+ */
+export function fillFloorPattern(
+  ctx: CanvasRenderingContext2D,
+  bbox: { minX: number; minY: number; maxX: number; maxY: number },
+  pxPerM: number,
+  opts: FloorPatternOptions,
+): void {
+  const rand = rng(hashStr(opts.base + opts.pattern + (opts.direction ?? '')));
+  const { minX, minY, maxX, maxY } = bbox;
+  const W = maxX - minX;
+  const H = maxY - minY;
+
+  // Basisfüllung (verhindert jegliche Lücken → nie „leer").
+  ctx.fillStyle = opts.base;
+  ctx.fillRect(minX, minY, W, H);
+
+  if (opts.tile) {
+    fillTileGrid(ctx, bbox, pxPerM, opts, rand);
+    return;
+  }
+
+  const p = opts.pattern;
+  if (p === 'fischgraet') fillHerringbone(ctx, bbox, pxPerM, opts, rand);
+  else if (p === 'chevron') fillChevron(ctx, bbox, pxPerM, opts, rand);
+  else if (p === 'wuerfel' || p === 'mosaik' || p === 'flechtmuster') fillBasketWeave(ctx, bbox, pxPerM, opts, rand);
+  else fillPlanks(ctx, bbox, pxPerM, opts, rand);
+  void H;
+}
+
+function fillPlanks(
+  ctx: CanvasRenderingContext2D,
+  { minX, minY, maxX, maxY }: { minX: number; minY: number; maxX: number; maxY: number },
+  pxPerM: number,
+  opts: FloorPatternOptions,
+  rand: () => number,
+): void {
+  const diagonal = opts.direction === 'diagonal' || opts.pattern === 'diagonal';
+  const quer = opts.direction === 'quer';
+  const lenPx = (opts.unitM ?? 1.2) * pxPerM;
+  const widPx = 0.18 * pxPerM;
+  const stagger = opts.pattern === 'schiffsboden' ? lenPx / 3 : lenPx / 2;
+  ctx.save();
+  if (diagonal) {
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    ctx.translate(cx, cy);
+    ctx.rotate(Math.PI / 4);
+    ctx.translate(-cx, -cy);
+  }
+  const angle = quer ? Math.PI / 2 : 0;
+  const rowH = quer ? lenPx : widPx;
+  const pad = Math.max(lenPx, widPx) * 1.5;
+  let row = 0;
+  for (let y = minY - pad; y < maxY + pad; y += rowH) {
+    const off = (row % 2 === 0 ? 0 : stagger) + (quer ? 0 : 0);
+    const colW = quer ? widPx : lenPx;
+    for (let x = minX - pad + (off % colW) - colW; x < maxX + pad; x += colW) {
+      const cx = x + colW / 2;
+      const cy = y + rowH / 2;
+      if (quer) plank(ctx, cx, cy, lenPx, widPx, angle, opts.base, opts.grain, rand);
+      else plank(ctx, cx, cy, lenPx, widPx, 0, opts.base, opts.grain, rand);
+    }
+    row++;
+  }
+  ctx.restore();
+}
+
+function fillHerringbone(
+  ctx: CanvasRenderingContext2D,
+  { minX, minY, maxX, maxY }: { minX: number; minY: number; maxX: number; maxY: number },
+  pxPerM: number,
+  opts: FloorPatternOptions,
+  rand: () => number,
+): void {
+  // ±45°-Dielen auf versetztem Gitter (Basisfüllung dahinter → keine Lücken).
+  const lenPx = (opts.unitM ?? 0.6) * pxPerM;
+  const widPx = lenPx / 5;
+  const s = (lenPx + widPx) / Math.SQRT2; // Gitterabstand
+  const halfDiag = (lenPx / 2) / Math.SQRT2;
+  const pad = lenPx;
+  for (let j = -1; ; j++) {
+    const baseY = minY - pad + j * s;
+    if (baseY > maxY + pad) break;
+    for (let i = -1; ; i++) {
+      const baseX = minX - pad + i * s;
+      if (baseX > maxX + pad) break;
+      // Plank A (+45°) und Plank B (−45°) bilden den Zickzack.
+      plank(ctx, baseX, baseY, lenPx, widPx, Math.PI / 4, opts.base, opts.grain, rand);
+      plank(ctx, baseX + halfDiag, baseY + halfDiag, lenPx, widPx, -Math.PI / 4, opts.base, opts.grain, rand);
+    }
+  }
+}
+
+function fillChevron(
+  ctx: CanvasRenderingContext2D,
+  { minX, minY, maxX, maxY }: { minX: number; minY: number; maxX: number; maxY: number },
+  pxPerM: number,
+  opts: FloorPatternOptions,
+  rand: () => number,
+): void {
+  // Spalten von Parallelogramm-Dielen, Steigung alterniert → durchgehendes V.
+  const lenPx = (opts.unitM ?? 0.6) * pxPerM;
+  const widPx = lenPx / 5;
+  const colW = lenPx * Math.cos(Math.PI / 4);
+  const pad = lenPx;
+  let col = 0;
+  for (let x = minX - pad; x < maxX + pad; x += colW) {
+    const angle = col % 2 === 0 ? -Math.PI / 4 : Math.PI / 4;
+    const cx = x + colW / 2;
+    for (let y = minY - pad; y < maxY + pad; y += widPx / Math.cos(Math.PI / 4)) {
+      plank(ctx, cx, y, lenPx, widPx, angle, opts.base, opts.grain, rand);
+    }
+    col++;
+  }
+}
+
+function fillBasketWeave(
+  ctx: CanvasRenderingContext2D,
+  { minX, minY, maxX, maxY }: { minX: number; minY: number; maxX: number; maxY: number },
+  pxPerM: number,
+  opts: FloorPatternOptions,
+  rand: () => number,
+): void {
+  const cell = (opts.unitM ?? 0.4) * pxPerM;
+  const widPx = cell / 4;
+  let row = 0;
+  for (let y = minY; y < maxY; y += cell) {
+    let colN = 0;
+    for (let x = minX; x < maxX; x += cell) {
+      const horizontal = (row + colN) % 2 === 0;
+      const cx = x + cell / 2;
+      const cy = y + cell / 2;
+      const n = 3;
+      for (let k = 0; k < n; k++) {
+        const off = (k - (n - 1) / 2) * (widPx + 1);
+        if (horizontal) plank(ctx, cx, cy + off, cell - 2, widPx, 0, opts.base, opts.grain, rand);
+        else plank(ctx, cx + off, cy, cell - 2, widPx, Math.PI / 2, opts.base, opts.grain, rand);
+      }
+      colN++;
+    }
+    row++;
+  }
+}
+
+function fillTileGrid(
+  ctx: CanvasRenderingContext2D,
+  { minX, minY, maxX, maxY }: { minX: number; minY: number; maxX: number; maxY: number },
+  pxPerM: number,
+  opts: FloorPatternOptions,
+  rand: () => number,
+): void {
+  const sizePx = (opts.unitM ?? 0.6) * pxPerM;
+  const grout = opts.groutColor ?? withShade(opts.base, -28);
+  for (let y = minY; y < maxY; y += sizePx) {
+    for (let x = minX; x < maxX; x += sizePx) {
+      ctx.fillStyle = withShade(opts.base, (rand() - 0.5) * 10);
+      ctx.fillRect(x + 1, y + 1, sizePx - 2, sizePx - 2);
+      // dezente Steinstruktur
+      ctx.strokeStyle = withShade(opts.grain, rand() * 14);
+      ctx.globalAlpha = 0.1;
+      ctx.lineWidth = 1;
+      for (let k = 0; k < 3; k++) {
+        ctx.beginPath();
+        ctx.moveTo(x + rand() * sizePx, y);
+        ctx.lineTo(x + rand() * sizePx, y + sizePx);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+  // Fugen
+  ctx.strokeStyle = grout;
+  ctx.lineWidth = Math.max(1.5, sizePx * 0.03);
+  for (let y = minY; y <= maxY; y += sizePx) {
+    ctx.beginPath();
+    ctx.moveTo(minX, y);
+    ctx.lineTo(maxX, y);
+    ctx.stroke();
+  }
+  for (let x = minX; x <= maxX; x += sizePx) {
+    ctx.beginPath();
+    ctx.moveTo(x, minY);
+    ctx.lineTo(x, maxY);
+    ctx.stroke();
+  }
+}
+
 /** Erzeugt eine Data-URL der Textur (für PDF / <img>). */
 export function textureDataUrl(texture: Texture, w = 240, h = 160): string {
   const canvas = document.createElement('canvas');

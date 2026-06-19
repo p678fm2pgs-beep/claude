@@ -13,6 +13,7 @@ export function ProjectList() {
   const deleteProjectById = useStore((s) => s.deleteProjectById);
   const duplicateProject = useStore((s) => s.duplicateProject);
   const seedDemo = useStore((s) => s.seedDemo);
+  const seedShowcase = useStore((s) => s.seedShowcase);
   const importProject = useStore((s) => s.importProject);
   const showToast = useStore((s) => s.showToast);
   const [name, setName] = useState('');
@@ -70,6 +71,9 @@ export function ProjectList() {
           </button>
           <button className="btn btn-ghost" onClick={seedDemo} data-testid="seed-demo">
             <Sparkles size={16} /> {t('projects.seedDemo')}
+          </button>
+          <button className="btn btn-ghost" onClick={seedShowcase} data-testid="seed-showcase">
+            <Sparkles size={16} /> {t('projects.seedShowcase')}
           </button>
           <button className="btn btn-ghost" onClick={() => fileRef.current?.click()}>
             <Upload size={16} /> {t('common.import')}

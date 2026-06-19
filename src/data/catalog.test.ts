@@ -6,8 +6,8 @@ import { TRADE_POSITIONS } from './prices';
 import { ADDONS } from './addons';
 
 describe('Katalog-Vollständigkeit — Farben', () => {
-  it('12 Familien mit je ≥ 10 Tönen', () => {
-    expect(COLOR_FAMILIES.length).toBe(12);
+  it('≥ 12 Familien mit je ≥ 10 Tönen (additiv erweiterbar)', () => {
+    expect(COLOR_FAMILIES.length).toBeGreaterThanOrEqual(12);
     for (const fam of COLOR_FAMILIES) {
       expect(fam.tones.length).toBeGreaterThanOrEqual(10);
     }

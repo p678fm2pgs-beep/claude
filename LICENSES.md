@@ -37,3 +37,15 @@ deterministisches Canvas-Rauschen/Gradient im jeweiligen Materialton). Das erfü
 
 RAL-Classic- und NCS-Codes in `src/data/colors.ts` sind **Annäherungen** zur Orientierung.
 Verbindlich ist ausschließlich der physische Originalfarbton bzw. das Musterstück.
+
+## Erweiterung 4 — Verlegemuster & realistische 2D-Ansicht
+
+Die „Realistische Ansicht" (`src/components/RealisticPlan.tsx`) füllt die Bodenfläche mit
+**prozedural erzeugten** Verlegemustern (`src/lib/texture.ts`: Diele, Fischgräte, Chevron, Würfel/
+Flechtmuster, Diagonal, Fliesenraster mit Fugen). Alles offline & deterministisch, keine externen
+Laufzeit-Requests. Status weiterhin: **Platzhalter-Qualität** (erkennbar Holz/Stein/Fliese/Fischgräte),
+fotorealistische CC0-Albedo-Texturen (Poly Haven / ambientCG, CC0) sind ein dokumentierter Roadmap-Schritt
+und können je Material in `src/data/materials.ts` hinterlegt werden.
+
+RAL/NCS sowie Hersteller-Codes (Farrow & Ball, Little Greene, Caparol, Alpina) in
+`src/data/colors.ts` sind **Annäherungen** — verbindlich nur der Original-Farbfächer des Herstellers.

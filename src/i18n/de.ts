@@ -88,6 +88,7 @@ export const de: Record<string, string> = {
   'projects.modified': 'Geändert',
   'projects.deleteConfirm': 'Dieses Projekt wirklich löschen?',
   'projects.seedDemo': 'Demo „Musterwohnung Düsseldorf" laden',
+  'projects.seedShowcase': 'Showcase „Musterwohnzimmer" (2D realistisch) laden',
 
   // Rooms
   'rooms.title': 'Räume',
@@ -114,6 +115,14 @@ export const de: Record<string, string> = {
   'rooms.redo': 'Wiederholen',
   'rooms.duplicate': 'Raum duplizieren',
   'rooms.wallLength': 'Wandlänge',
+  'plan.technical': 'Technischer Plan',
+  'plan.realistic': 'Realistische Ansicht',
+
+  // Beleuchtung (Erweiterung 4)
+  'lighting.title': 'Beleuchtung',
+  'lighting.add': 'Leuchte hinzufügen',
+  'lighting.kelvin': 'Lichtfarbe',
+  'lighting.empty': 'Noch keine Beleuchtung gewählt.',
 
   // Room types
   'roomType.wohnzimmer': 'Wohnzimmer',
