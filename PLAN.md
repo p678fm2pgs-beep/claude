@@ -65,3 +65,38 @@ Beratungsmodus (geführt) · Expertenmodus (Dashboard, EK/Marge, Editoren) · Pr
 `npm run verify` grün · Kunden-Reise-E2E (DE/EN) · Toter-Knopf-Scan 0 · 0 console.error ·
 Kosten-Engine 100% unit-getestet · PDF/Persistenz/Validierung grün · Demo-Projekt · offline ·
 LICENSES.md · QA-REPORT.md · FINAL-REPORT.md.
+
+---
+
+## Erweiterung 4 — Großer Katalog- & 2D-Visualisierungs-Ausbau (rein additiv)
+
+**Ehernes Gesetz:** nichts Bestehendes überschreiben/entfernen. Regression = Bug Nr. 1.
+Schutzschild: `src/test/no-regression.test.ts` (Baselines: 120 Töne · 12 Familien · 63 Materialien ·
+18 Möbel · 18 Gewerke · 25 Nebenpos. · 5 Presets; + Stichproben + Altprojekt-Migration/Kalkulation).
+Backup-Tag: `backup-vor-erweiterung4`.
+
+### Datenmodell (Zwei-Ebenen, additiv, schemaVersion 2 → 3)
+- Ebene 1 „Material/Typ" bleibt unverändert. Ebene 2 „Variante" als **optionale** Felder:
+  `MaterialSelection.layingDirection | woodSpecies | finish | format | groutColor`,
+  erweiterte `pattern`-Union (fischgraet, chevron, schiffsboden, wuerfel, mosaik, flechtmuster …).
+- `Opening.frameColor?` (z. B. schwarze Fensterrahmen).
+- `Variant.wallColors?` (Farbe je Wand), `Variant.lights?` (`LightSelection`).
+- Migration v2→v3 stamp-only (alle neuen Felder optional → Altdaten bleiben gültig).
+
+### Textur-Strategie
+- Bestehender prozeduraler Generator (`src/lib/texture.ts`) wird additiv um **Verlegemuster-Rendering**
+  ergänzt (Diele/Fischgräte/Chevron/Würfel/Diagonal, Fliesenraster + Fugenfarbe) — offline, deterministisch,
+  niemals leer, kein „Lego-Look". Wandfarben HEX-treu.
+
+### 2D „Realistische Ansicht" (Kernpunkt, additiv)
+- Neue Komponente `RealisticPlan` rendert Bodenfläche mit Material-Textur + Muster, Wände als
+  farbige/material­ige Stärke-Streifen, Tür-Öffnungsbogen + Fenster-Mehrfachlinie (+ Rahmenfarbe),
+  Decken-/Voute-Lichtsaum. Umschalter **Technischer Plan ⇄ Realistische Ansicht**; der bestehende
+  `MiniPlan` (technisch) bleibt unverändert erhalten.
+
+### Selbstkritik / Risiken
+- Größtes Risiko: versehentliche Regression bestehender Kataloge/Tests → durch Schutzschild abgesichert.
+- 2D-Performance: Texturen werden in einen Off-Screen-Canvas gekachelt und als Pattern gefüllt (nicht pro
+  Pixel) → flüssig.
+- Realismus aus prozeduralen Texturen ist begrenzt; Anspruch ist „erkennbar Holz/Stein/Fliese/Fischgräte",
+  nicht Fotorealismus. CC0-Fototexturen sind ein Roadmap-Schritt.

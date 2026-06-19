@@ -4,7 +4,7 @@
  * Maße intern in Zentimetern, Flächen werden live abgeleitet (nie persistiert).
  */
 
-export const SCHEMA_VERSION = 2 as const;
+export const SCHEMA_VERSION = 3 as const;
 
 export type Lang = 'de' | 'en';
 export type AppMode = 'beratung' | 'experte' | 'praesentation';
@@ -47,7 +47,41 @@ export interface Opening {
   heightCm: number;
   /** Brüstungshöhe in cm (nur Fenster sinnvoll). */
   sillCm: number;
+  /** (Erweiterung 4, optional) Rahmenfarbe als HEX, z. B. schwarze Fensterrahmen. */
+  frameColor?: string;
 }
+
+// ── Erweiterung 4: Zwei-Ebenen-Logik (alle Felder optional → Altdaten bleiben gültig) ──
+
+/** Verlegemuster (Ebene 2). */
+export type LayingPattern =
+  | 'gerade'
+  | 'diagonal'
+  | 'verband'
+  | 'fischgraet'
+  | 'chevron'
+  | 'schiffsboden'
+  | 'landhausdiele'
+  | 'wuerfel'
+  | 'mosaik'
+  | 'flechtmuster';
+
+/** Verlegerichtung (Ebene 2). */
+export type LayingDirection = 'laengs' | 'quer' | 'diagonal';
+
+/** Oberfläche/Finish (Ebene 2, Holzböden). */
+export type Finish =
+  | 'natur-geoelt'
+  | 'weiss-geoelt'
+  | 'matt-lackiert'
+  | 'seidenmatt'
+  | 'geraeuchert'
+  | 'gebuerstet'
+  | 'gekaelkt'
+  | 'dunkel-gebeizt'
+  | 'rustikal'
+  | 'handgehobelt'
+  | 'gebeizt-grau';
 
 export interface Floorplan {
   /** Polygon-Eckpunkte in cm, im Uhrzeigersinn oder gegen. */
@@ -70,8 +104,18 @@ export interface MaterialSelection {
   tier: PriceTier;
   /** Optionale Zuordnung zu einer Wand (Index) für getrennte Wandmaterialien. */
   wallIndex?: number;
-  /** Verlegemuster (nur Boden) — beeinflusst Verschnitt. */
-  pattern?: 'gerade' | 'diagonal' | 'fischgraet' | 'verband';
+  /** Verlegemuster (nur Boden) — beeinflusst Verschnitt & 2D-Darstellung. */
+  pattern?: LayingPattern;
+  /** (Erweiterung 4, optional) Verlegerichtung. */
+  layingDirection?: LayingDirection;
+  /** (Erweiterung 4, optional) Holzart als Variante (z. B. 'eiche-geraeuchert'). */
+  woodSpecies?: string;
+  /** (Erweiterung 4, optional) Oberfläche/Finish. */
+  finish?: Finish;
+  /** (Erweiterung 4, optional) Fliesenformat, z. B. '60x120'. */
+  format?: string;
+  /** (Erweiterung 4, optional) Fugenfarbe als HEX (Fliesen). */
+  groutColor?: string;
   /** Aktive Nebenpositionen (default alle an). Map id->aktiv. */
   addonsDisabled?: string[];
 }
@@ -103,10 +147,29 @@ export interface TradeSelection {
   quantity: number;
 }
 
+/** (Erweiterung 4, optional) Platzierte/zugewiesene Beleuchtungs-Position. */
+export interface LightSelection {
+  id: string;
+  /** Verweis auf Beleuchtungs-Katalog. */
+  fixtureId: string;
+  tier: PriceTier;
+  quantity: number;
+  /** Lichtfarbe in Kelvin (z. B. 2700). */
+  kelvin?: number;
+  /** Profil-Art für indirektes Licht (z. B. 'vouten-profil'). */
+  profile?: string;
+  /** Für umlaufende Voute: an welchen Wänden (Indizes) der Lichtsaum sitzt. */
+  wallIndices?: number[];
+}
+
 export interface Variant {
   id: string;
   name: string;
   colorRoles: Partial<Record<ColorRole, string>>; // role -> colorToneId
+  /** (Erweiterung 4, optional) Farbe je einzelner Wand: wallIndex -> colorToneId. */
+  wallColors?: Record<number, string>;
+  /** (Erweiterung 4, optional) Beleuchtungs-Positionen. */
+  lights?: LightSelection[];
   materials: MaterialSelection[];
   furniture: FurnitureItem[];
   trades: TradeSelection[];

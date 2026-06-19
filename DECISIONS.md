@@ -12,3 +12,12 @@
 | 8 | Einheiten intern in cm/m² konsistent, Anzeige formatiert (DE-Komma) | Vermeidet NaN/Rundungsfehler; Parsing akzeptiert Komma & Punkt | Float-Meter überall (Rundungsdrift) |
 | 9 | Rundung erst am Ende der Kostenkette | Spec-Pflicht; vermeidet kumulierte Rundungsfehler | Pro Position runden (ungenau) |
 | 10 | E2E mit Playwright/Chromium, Unit mit Vitest/jsdom | Standard, schnell, gut in CI | Cypress (schwergewichtiger) |
+
+## Erweiterung 4 (rein additiv)
+| # | Entscheidung | Warum | Alternative |
+|---|---|---|---|
+| 11 | Zwei-Ebenen-Modell über **optionale** Felder statt neuer Pflichtfelder | Altdaten bleiben ohne Migration gültig; keine Regression | Neue Pflichtfelder (würde Altprojekte brechen) |
+| 12 | schemaVersion 2→3 als stamp-only Migration | Neue Felder optional → kein Datenumbau nötig | Vollmigration (unnötig, riskanter) |
+| 13 | Verlegemuster prozedural aus Dielen-Albedo erzeugt (Canvas) | Offline, deterministisch, keine externen Assets, beliebig kachelbar | Fertige Muster-Fotos (Lizenz/Größe/Flakiness) |
+| 14 | `RealisticPlan` als NEUE Komponente neben `MiniPlan` | Bestehender technischer Plan bleibt 1:1 erhalten (additiv) | MiniPlan umbauen (Regressionsrisiko) |
+| 15 | Beleuchtung als eigener Katalog + `Variant.lights` | Saubere Trennung, additiv in Kalkulation | In Möbel mischen (unsauber) |

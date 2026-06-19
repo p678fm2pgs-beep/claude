@@ -72,6 +72,11 @@ export const VERSCHNITT: Record<string, number> = {
   verband: 0.05,
   fischgraet: 0.12,
   chevron: 0.12,
+  schiffsboden: 0.05,
+  landhausdiele: 0.05,
+  wuerfel: 0.1,
+  mosaik: 0.12,
+  flechtmuster: 0.12,
   grossformat: 0.08,
   fliese: 0.08,
 };

@@ -24,6 +24,24 @@ export function migrateProject(input: Project): Project {
     };
   }
 
+  if (version < 3) {
+    // v2 → v3 (Erweiterung 4): neue Felder sind ALLE optional.
+    // Es gehen keine Daten verloren — wir stellen nur sicher, dass `lights`
+    // initialisiert ist, falls UI darauf zugreift. Alle anderen neuen Felder
+    // (wallColors, pattern-Erweiterungen, finish, frameColor …) bleiben undefined,
+    // bis sie bewusst gesetzt werden.
+    p = {
+      ...p,
+      rooms: p.rooms.map((r) => ({
+        ...r,
+        variants: r.variants.map((v) => ({
+          ...v,
+          lights: v.lights ?? [],
+        })),
+      })),
+    };
+  }
+
   // Defensive Defaults (falls Felder fehlen).
   p.settings = {
     reservePercent: p.settings?.reservePercent ?? 10,
