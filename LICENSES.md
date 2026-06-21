@@ -49,3 +49,9 @@ und können je Material in `src/data/materials.ts` hinterlegt werden.
 
 RAL/NCS sowie Hersteller-Codes (Farrow & Ball, Little Greene, Caparol, Alpina) in
 `src/data/colors.ts` sind **Annäherungen** — verbindlich nur der Original-Farbfächer des Herstellers.
+
+## three.js (3D-Raumansicht)
+
+- **three.js** (`three`, `@types/three`) — **MIT License** (© three.js authors / mrdoob).
+  Lokal als npm-Abhängigkeit gebündelt, kein CDN/Laufzeit-Request. Wird per Code-Splitting erst
+  geladen, wenn die 3D-Ansicht geöffnet wird. WebGL-Canvas, offline lauffähig.

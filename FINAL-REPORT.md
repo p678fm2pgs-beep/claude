@@ -173,3 +173,24 @@ aktualisiert ✅.
 - Browsergebundene Screenshot-Galerie/E2E weiterhin nur in Umgebungen mit Browser ausführbar
   (`e2e/realistic.spec.ts` vorhanden).
 - Roadmap: mehr Fototexturen, Pipette/Custom-HEX an Wänden, spätere 3D-Verknüpfung.
+
+---
+
+# 3D-Raumansicht (three.js, additiv)
+
+Dritte Plan-Ansicht neben **Technisch** und **Realistisch**: im Raum-Editor schaltbar über
+**Technischer Plan ⇄ Realistische Ansicht ⇄ 3D**.
+
+- **three.js (MIT, lokal, offline)** — per Code-Splitting erst geladen, wenn die 3D-Ansicht geöffnet wird
+  (separater Chunk ~130 KB gzip; Initial-Bundle unverändert ~261 KB gzip).
+- Aus dem bestehenden Grundriss werden **Wände extrudiert** (`computeWallPanels`, rein & unit-getestet):
+  Türen = volle Aussparung, Fenster = Aussparung mit erhaltener **Brüstung + Sturz**. Jede Wand in ihrer
+  **gewählten Farbe/ihrem Material**; der **Boden** trägt das gewählte Material inkl. **Verlegemuster**
+  (per `CanvasTexture` aus demselben Muster-Generator wie die 2D-Ansicht). Orbit-Steuerung (Maus/Touch),
+  warmes Licht-Setup.
+- Fällt WebGL aus, zeigt die Komponente einen gestalteten Hinweis statt eines Crashs.
+- **Tests:** `src/lib/room3d.test.ts` (Panel-Zerlegung: Tür-Gap, Fenster Brüstung/Sturz, Flächen-Plausibilität);
+  E2E `e2e/realistic.spec.ts` schaltet auf 3D und prüft den WebGL-Canvas. `npm run verify` GRÜN (117 Tests).
+- Godot wurde bewusst **nicht** integriert (eigenständige Spiele-Engine, passt nicht in die Web-App).
+
+Roadmap 3D: Möbel-Platzhalter im Raum, Texturen mit Normal-Maps, Begehung (First-Person), Export als glTF.

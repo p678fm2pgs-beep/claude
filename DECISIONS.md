@@ -21,3 +21,10 @@
 | 13 | Verlegemuster prozedural aus Dielen-Albedo erzeugt (Canvas) | Offline, deterministisch, keine externen Assets, beliebig kachelbar | Fertige Muster-Fotos (Lizenz/Größe/Flakiness) |
 | 14 | `RealisticPlan` als NEUE Komponente neben `MiniPlan` | Bestehender technischer Plan bleibt 1:1 erhalten (additiv) | MiniPlan umbauen (Regressionsrisiko) |
 | 15 | Beleuchtung als eigener Katalog + `Variant.lights` | Saubere Trennung, additiv in Kalkulation | In Möbel mischen (unsauber) |
+
+## three.js — 3D-Raumansicht (additiv)
+| # | Entscheidung | Warum | Alternative |
+|---|---|---|---|
+| 16 | three.js (MIT) für die 3D-Ansicht | De-facto-Standard für WebGL, lokal bündelbar, offline | eigenes WebGL (Aufwand), babylon.js (schwerer) |
+| 17 | `Room3D` per `React.lazy` code-gesplittet | three.js (~130 KB gzip) lädt erst bei Bedarf → Initial-Bundle/2D bleibt schlank | statischer Import (vergrößert Startbundle) |
+| 18 | Wand-Öffnungen über reine `computeWallPanels`-Zerlegung statt CSG | unit-testbar, performant, kein Boolean-Mesh-Aufwand | three-bvh-csg (Abhängigkeit, langsamer) |
