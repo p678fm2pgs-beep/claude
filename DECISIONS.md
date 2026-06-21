@@ -28,3 +28,13 @@
 | 16 | three.js (MIT) für die 3D-Ansicht | De-facto-Standard für WebGL, lokal bündelbar, offline | eigenes WebGL (Aufwand), babylon.js (schwerer) |
 | 17 | `Room3D` per `React.lazy` code-gesplittet | three.js (~130 KB gzip) lädt erst bei Bedarf → Initial-Bundle/2D bleibt schlank | statischer Import (vergrößert Startbundle) |
 | 18 | Wand-Öffnungen über reine `computeWallPanels`-Zerlegung statt CSG | unit-testbar, performant, kein Boolean-Mesh-Aufwand | three-bvh-csg (Abhängigkeit, langsamer) |
+
+## Erweiterung 5 — 3D-Realismus (additiv)
+| # | Entscheidung | Warum | Alternative |
+|---|---|---|---|
+| 19 | Bestehende three.js-Szene erweitern statt Umbau auf React-Three-Fiber | Eherne Regel „additiv, nichts ersetzen"; R3F wäre ein Rewrite | R3F + drei (Rewrite-Risiko) |
+| 20 | IBL via `RoomEnvironment` (PMREM) statt HDRI-Datei | Vollständig offline & ohne Asset-Download (Sandbox blockiert Downloads), neutrales Studio-Licht | Poly-Haven-HDRI (Download/Lizenz/Größe) |
+| 21 | ACESFilmic-Tone-Mapping + sRGB-Output | Behebt ausgewaschene Farben → satte, edle Bildwirkung | Linear/kein Tone-Mapping (flach) |
+| 22 | Weiche Sonnen-Schatten (PCFSoftShadowMap, 2k) + Hemisphere-Fill | Räumliche Tiefe, kein „totes" Schwarz; Performance gedeckelt | Raytracing/zu hohe Map (zu langsam) |
+| 23 | Öffnungen über reine `computeOpeningParts` füllen (Rahmen/Glas/Türblatt) | Unit-testbar, kein CSG; behebt „leere Löcher" konkret | Boolean-CSG (langsam, fragil) |
+| 24 | Glas als `MeshPhysicalMaterial` (transmission) | Echte Verglasung mit Lichtdurchlass/Reflex | Halbtransparentes Standardmaterial (billig) |

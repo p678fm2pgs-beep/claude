@@ -1,17 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { Room, Variant } from '../types';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import type { Orientation, Room, Variant } from '../types';
 import { computeWallPanels } from '../lib/room3d';
+import { computeOpeningParts, type OpeningPartKind } from '../lib/openings3d';
 import { fillFloorPattern } from '../lib/texture';
 import { findMaterial } from '../data/materials';
 import { findTone } from '../data/colors';
 import { useT } from '../hooks';
 
+/** Himmelsrichtung → Azimut (Grad) für den Sonnenstand. */
+const AZIMUTH: Record<Orientation, number> = { S: 0, SW: 45, W: 90, NW: 135, N: 180, NO: 225, O: 270, SO: 315 };
+
 /**
  * 3D-Raumansicht (three.js) — additiv neben Technisch & Realistisch.
- * Extrudiert Wände aus dem Grundriss, lässt Tür-/Fenster-Öffnungen frei,
- * legt das gewählte Bodenmaterial/Verlegemuster als Textur auf den Boden.
+ * Erweiterung 5: Archviz-Pipeline (ACES-Tone-Mapping, IBL via RoomEnvironment, weiche
+ * Sonnen-Schatten, PBR-Rauheit) + gefüllte Öffnungen (Fenster: Rahmen+Glas+Sprosse,
+ * Türen: Zarge+Türblatt) — keine leeren Löcher mehr.
  * Komplett offline (three.js lokal gebündelt). Orbit per Maus/Touch.
  */
 export function Room3D({
@@ -37,18 +43,30 @@ export function Room3D({
 
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
     } catch {
       setFailed(true);
       return;
     }
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = false;
+    // Erweiterung 5 — Render-Pipeline: behebt flache, ausgewaschene Bildwirkung.
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     mount.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color('#EDEAE2');
+    scene.background = new THREE.Color('#E7E3DA');
+
+    // Image-Based Lighting (IBL): neutrales Studio-Environment, lokal generiert (offline).
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const roomEnv = new RoomEnvironment();
+    const envTex = pmrem.fromScene(roomEnv, 0.04).texture;
+    scene.environment = envTex;
+    (roomEnv as unknown as { dispose?: () => void }).dispose?.();
 
     // ── Maßstab & Zentrierung (Meter) ──
     const xs = pts.map((p) => p.x / 100);
@@ -67,14 +85,28 @@ export function Room3D({
     const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 100);
     camera.position.set(span * 0.9, span * 1.0 + Hm, span * 1.1);
 
-    // ── Licht ──
-    scene.add(new THREE.AmbientLight(0xffffff, 0.85));
-    const dir = new THREE.DirectionalLight(0xfff4e0, 0.9);
-    dir.position.set(span, span * 2 + 2, span * 0.6);
-    scene.add(dir);
-    const fill = new THREE.DirectionalLight(0xdfe6ff, 0.35);
-    fill.position.set(-span, span, -span);
-    scene.add(fill);
+    // ── Licht & weiche Schatten ──
+    // Himmel/Boden-Füllung (kein „totes" Schwarz in Schatten).
+    scene.add(new THREE.HemisphereLight(0xffffff, 0xb9b2a4, 0.55));
+    // Sonne mit weichen Schatten, Richtung aus der Raumausrichtung.
+    const az = ((AZIMUTH[room.light.orientation] ?? 0) * Math.PI) / 180;
+    const sun = new THREE.DirectionalLight(0xfff2dd, 2.6);
+    const sunDist = span * 1.8 + 3;
+    sun.position.set(Math.sin(az) * sunDist, span * 2.2 + Hm, Math.cos(az) * sunDist);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    const sr = span * 1.3 + 1;
+    sun.shadow.camera.left = -sr;
+    sun.shadow.camera.right = sr;
+    sun.shadow.camera.top = sr;
+    sun.shadow.camera.bottom = -sr;
+    sun.shadow.camera.near = 0.5;
+    sun.shadow.camera.far = sunDist * 2 + span * 3;
+    sun.shadow.bias = -0.0004;
+    sun.shadow.normalBias = 0.02;
+    sun.target.position.set(0, 0, 0);
+    scene.add(sun);
+    scene.add(sun.target);
 
     // ── Boden mit Material/Verlegemuster ──
     const shape = new THREE.Shape();
@@ -122,15 +154,53 @@ export function Room3D({
       tex.offset.set(-(minXm - cx) / spanX, -(minZm - cz) / spanZ);
       tex.needsUpdate = true;
       disposables.push(tex);
-      floorMaterial = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85, metalness: 0.02 });
+      // Stein/Fliese dezent reflektierend, Holz matter — reagiert auf Licht/Environment.
+      floorMaterial = new THREE.MeshStandardMaterial({
+        map: tex,
+        roughness: isTile ? 0.4 : 0.62,
+        metalness: 0.0,
+        envMapIntensity: isTile ? 1.0 : 0.7,
+      });
     } else {
-      floorMaterial = new THREE.MeshStandardMaterial({ color: '#D9D2C4', roughness: 0.9 });
+      floorMaterial = new THREE.MeshStandardMaterial({ color: '#D9D2C4', roughness: 0.8 });
     }
     disposables.push(floorMaterial);
-    scene.add(new THREE.Mesh(floorGeo, floorMaterial));
+    const floorMesh = new THREE.Mesh(floorGeo, floorMaterial);
+    floorMesh.receiveShadow = true;
+    scene.add(floorMesh);
 
-    // ── Wände (pro Wand Farbe; Öffnungen ausgespart) ──
-    const wallThickness = 0.1;
+    // ── Wände (pro Wand Farbe; Öffnungen ausgespart) + gefüllte Öffnungen ──
+    const wallThickness = 0.12;
+    // Material-Cache für Öffnungsteile (Rahmen/Glas/Türblatt) je Farbe.
+    const partMatCache = new Map<string, THREE.Material>();
+    const partMaterial = (kind: OpeningPartKind, frameColor?: string): THREE.Material => {
+      const key = `${kind}:${frameColor ?? ''}`;
+      const cached = partMatCache.get(key);
+      if (cached) return cached;
+      let m: THREE.Material;
+      if (kind === 'glass') {
+        m = new THREE.MeshPhysicalMaterial({
+          color: '#cfe0e6',
+          roughness: 0.05,
+          metalness: 0,
+          transmission: 0.92,
+          transparent: true,
+          opacity: 0.55,
+          thickness: 0.02,
+          ior: 1.5,
+          envMapIntensity: 1.2,
+        });
+      } else if (kind === 'leaf') {
+        m = new THREE.MeshStandardMaterial({ color: frameColor ?? '#b98c5a', roughness: 0.55, metalness: 0.05 });
+      } else {
+        // frame / mullion
+        m = new THREE.MeshStandardMaterial({ color: frameColor ?? '#2b2b2b', roughness: 0.5, metalness: 0.35 });
+      }
+      disposables.push(m);
+      partMatCache.set(key, m);
+      return m;
+    };
+
     for (let i = 0; i < pts.length; i++) {
       const A = { x: mapX(pts[i].x), z: mapZ(pts[i].y) };
       const B = { x: mapX(pts[(i + 1) % pts.length].x), z: mapZ(pts[(i + 1) % pts.length].y) };
@@ -141,21 +211,47 @@ export function Room3D({
       const uz = ez / len;
       const angle = Math.atan2(-ez, ex);
       const colorHex = wallColorHex(variant, i);
-      const wallMaterial = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.9 });
+      const wallMaterial = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.92, metalness: 0.0 });
       disposables.push(wallMaterial);
 
+      const place = (mesh: THREE.Mesh, alongCm: number, yCm: number) => {
+        const along = alongCm / 100;
+        mesh.position.set(A.x + ux * along, yCm / 100, A.z + uz * along);
+        mesh.rotation.y = angle;
+        scene.add(mesh);
+      };
+
+      // Massive Wandstücke
       const panels = computeWallPanels(room.floorplan, i, room.heightCm);
       for (const p of panels) {
         const w = (p.x1 - p.x0) / 100;
         const h = (p.y1 - p.y0) / 100;
         if (w <= 0 || h <= 0) continue;
-        const along = (p.x0 + p.x1) / 200; // m vom Wandanfang
         const geo = new THREE.BoxGeometry(w, h, wallThickness);
         disposables.push(geo);
         const mesh = new THREE.Mesh(geo, wallMaterial);
-        mesh.position.set(A.x + ux * along, (p.y0 + p.y1) / 200, A.z + uz * along);
-        mesh.rotation.y = angle;
-        scene.add(mesh);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        place(mesh, (p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2);
+      }
+
+      // Öffnungen dieser Wand mit echten Bauteilen füllen
+      const wallLen = len * 100; // cm
+      for (const o of room.floorplan.openings.filter((op) => op.wallIndex === i)) {
+        const parts = computeOpeningParts(o, wallLen, room.heightCm);
+        for (const part of parts) {
+          const w = (part.x1 - part.x0) / 100;
+          const h = (part.y1 - part.y0) / 100;
+          if (w <= 0 || h <= 0) continue;
+          const geo = new THREE.BoxGeometry(w, h, part.depthCm / 100);
+          disposables.push(geo);
+          const mesh = new THREE.Mesh(geo, partMaterial(part.kind, o.frameColor));
+          if (part.kind !== 'glass') {
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+          }
+          place(mesh, (part.x0 + part.x1) / 2, (part.y0 + part.y1) / 2);
+        }
       }
     }
 
@@ -181,6 +277,8 @@ export function Room3D({
       cancelAnimationFrame(raf);
       controls.dispose();
       disposables.forEach((d) => d.dispose());
+      envTex.dispose();
+      pmrem.dispose();
       renderer.dispose();
       if (renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement);
     };

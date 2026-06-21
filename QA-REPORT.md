@@ -62,3 +62,26 @@ wahren; Integrationstest auf den Editor-Scope eingegrenzt (mehrfache `floorplan-
 
 **Teststand nach Erweiterung 4:** 112 Vitest-Tests grün (inkl. 13 no-regression + 7 ext4 + Integration
 realistische Ansicht). E2E-Specs `e2e/realistic.spec.ts` ergänzt (browsergebunden).
+
+---
+
+## Erweiterung 5 — Protokoll (3D-Realismus, additiv) — Teil 1 (V0–V6)
+
+Backup-Tag `backup-vor-erweiterung5`. Regressionsschutz nach jedem Schritt GRÜN.
+
+| Schritt | Inhalt | verify |
+|---|---|---|
+| V0 | Sicherung + Regressionsschutz + Render-Geometrie-Tests (Wand-Panels, Öffnungs-Bauteile) | ✅ |
+| V1 | Render-Pipeline: ACES-Tone-Mapping, sRGB, IBL (RoomEnvironment/PMREM), höherer Pixelratio | ✅ |
+| V2 | Licht & Schatten: Sonne (Richtung aus Orientierung) mit weichen Schatten, Hemisphere-Füllung | ✅ |
+| V4 | PBR-Tuning: Boden (Holz matt / Stein-Fliese dezent reflektierend, envMapIntensity), Wände mattes Schwarz statt „Loch" | ✅ |
+| V5 | Fenster gefüllt: Rahmen (Materialfarbe) + Glas (MeshPhysicalMaterial transmission) + Sprosse | ✅ |
+| V6 | Türen gefüllt: Zarge + Türblatt (Materialfarbe), Boden-offen | ✅ |
+
+**Tests neu:** `src/lib/openings3d.test.ts` (5) — Fenster=4 Rahmen+Glas+Sprosse, Tür=3 Zargen+Türblatt,
+keine leeren Löcher. E2E `e2e/render3d.spec.ts` (browsergebunden): WebGL ohne console.error, Render
+nicht-trivial, „nachher"-Screenshot nach `qa/screenshots/erweiterung5/`.
+
+**Offen (Teil 2, dokumentierter Fahrplan):** V3 AO/Bloom-Postprocessing · V7 Lichtobjekte mit echter
+Wirkung · V8 Tag/Nacht · V9 Möbel in 3D (Platzieren/Rotieren/.glb) · V10 Begehen-Modus + Touch ·
+V11 Qualitätsstufen/FPS-Schutz/Export/Kundenpräsentation/PDF-3D · V12 Voll-Demo.
