@@ -2,8 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { Room, Variant } from '../types';
 import { wallLengthCm } from '../lib/geometry';
 import { fillFloorPattern } from '../lib/texture';
-import { findMaterial } from '../data/materials';
-import { findTone } from '../data/colors';
+import { resolveFloorSelection, resolveMaterial, resolveWallColorHex } from '../lib/materialResolve';
 import { findFixture } from '../data/lighting';
 
 /**
@@ -60,8 +59,8 @@ export function RealisticPlan({
     ctx.fillRect(0, 0, width, height);
 
     // ── Boden: Polygon clippen und Material/Muster füllen ──
-    const floorSel = variant.materials.find((m) => m.surface === 'boden');
-    const floorMat = floorSel ? findMaterial(floorSel.materialId) : undefined;
+    const floorSel = resolveFloorSelection(variant);
+    const floorMat = resolveMaterial(floorSel);
     ctx.save();
     ctx.beginPath();
     pts.forEach((p, i) => (i === 0 ? ctx.moveTo(tx(p.x), ty(p.y)) : ctx.lineTo(tx(p.x), ty(p.y))));
@@ -119,7 +118,7 @@ export function RealisticPlan({
     for (let i = 0; i < pts.length; i++) {
       const a = pts[i];
       const b = pts[(i + 1) % pts.length];
-      const color = wallColor(variant, i);
+      const color = resolveWallColorHex(variant, i);
       ctx.strokeStyle = color;
       ctx.lineWidth = wallPx;
       ctx.beginPath();
@@ -223,21 +222,4 @@ export function RealisticPlan({
       aria-label="Realistische 2D-Ansicht"
     />
   );
-}
-
-/** Farbe einer Wand: explizite Wandfarbe → Wandmaterial → Wand-Rolle → dezente Linie. */
-function wallColor(variant: Variant, wallIndex: number): string {
-  const explicit = variant.wallColors?.[wallIndex];
-  if (explicit) {
-    const tone = findTone(explicit);
-    if (tone) return tone.hex;
-  }
-  const wallMat = variant.materials.find((m) => m.surface === 'wand' && m.wallIndex === wallIndex);
-  if (wallMat) {
-    const mat = findMaterial(wallMat.materialId);
-    if (mat) return mat.texture.base;
-  }
-  const wandTone = findTone(variant.colorRoles.wand);
-  if (wandTone) return wandTone.hex;
-  return '#2a2622';
 }

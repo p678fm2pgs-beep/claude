@@ -6,8 +6,7 @@ import type { Orientation, Room, Variant } from '../types';
 import { computeWallPanels } from '../lib/room3d';
 import { computeOpeningParts, type OpeningPartKind } from '../lib/openings3d';
 import { fillFloorPattern } from '../lib/texture';
-import { findMaterial } from '../data/materials';
-import { findTone } from '../data/colors';
+import { resolveFloorSelection, resolveMaterial, resolveWallColorHex } from '../lib/materialResolve';
 import { useT } from '../hooks';
 
 /** Himmelsrichtung → Azimut (Grad) für den Sonnenstand. */
@@ -121,8 +120,8 @@ export function Room3D({
     floorGeo.rotateX(-Math.PI / 2);
     disposables.push(floorGeo);
 
-    const floorSel = variant.materials.find((m) => m.surface === 'boden');
-    const floorMat = floorSel ? findMaterial(floorSel.materialId) : undefined;
+    const floorSel = resolveFloorSelection(variant);
+    const floorMat = resolveMaterial(floorSel);
     let floorMaterial: THREE.Material;
     if (floorMat) {
       const isTile = floorMat.texture.variant === 'tile' || floorMat.texture.variant === 'stone';
@@ -210,7 +209,7 @@ export function Room3D({
       const ux = ex / len;
       const uz = ez / len;
       const angle = Math.atan2(-ez, ex);
-      const colorHex = wallColorHex(variant, i);
+      const colorHex = resolveWallColorHex(variant, i);
       const wallMaterial = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.92, metalness: 0.0 });
       disposables.push(wallMaterial);
 
@@ -292,20 +291,4 @@ export function Room3D({
     );
   }
   return <div ref={mountRef} data-testid="room-3d" style={{ width, height }} role="img" aria-label="3D-Raumansicht" />;
-}
-
-function wallColorHex(variant: Variant, wallIndex: number): string {
-  const explicit = variant.wallColors?.[wallIndex];
-  if (explicit) {
-    const tone = findTone(explicit);
-    if (tone) return tone.hex;
-  }
-  const wallMat = variant.materials.find((m) => m.surface === 'wand' && m.wallIndex === wallIndex);
-  if (wallMat) {
-    const mat = findMaterial(wallMat.materialId);
-    if (mat) return mat.texture.base;
-  }
-  const wandTone = findTone(variant.colorRoles.wand);
-  if (wandTone) return wandTone.hex;
-  return '#D9D2C4';
 }
