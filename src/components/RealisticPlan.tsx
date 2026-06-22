@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
 import type { Room, Variant } from '../types';
 import { wallLengthCm } from '../lib/geometry';
-import { fillFloorSurface } from '../lib/texture';
-import { resolveFloorSelection, resolveMaterial, resolveWallColorHex } from '../lib/materialResolve';
+import { fillFloorPattern } from '../lib/texture';
+import { findMaterial } from '../data/materials';
+import { findTone } from '../data/colors';
 import { findFixture } from '../data/lighting';
 
 /**
@@ -59,20 +60,29 @@ export function RealisticPlan({
     ctx.fillRect(0, 0, width, height);
 
     // ── Boden: Polygon clippen und Material/Muster füllen ──
-    const floorSel = resolveFloorSelection(variant);
-    const floorMat = resolveMaterial(floorSel);
+    const floorSel = variant.materials.find((m) => m.surface === 'boden');
+    const floorMat = floorSel ? findMaterial(floorSel.materialId) : undefined;
     ctx.save();
     ctx.beginPath();
     pts.forEach((p, i) => (i === 0 ? ctx.moveTo(tx(p.x), ty(p.y)) : ctx.lineTo(tx(p.x), ty(p.y))));
     ctx.closePath();
     ctx.clip();
     if (floorMat) {
-      fillFloorSurface(ctx, { minX: tx(minX), minY: ty(minY), maxX: tx(maxX), maxY: ty(maxY) }, pxPerM, {
-        texture: floorMat.texture,
-        pattern: floorSel?.pattern,
-        direction: floorSel?.layingDirection,
-        groutColor: floorSel?.groutColor,
-      });
+      const isTile = floorMat.texture.variant === 'tile' || floorMat.texture.variant === 'stone';
+      fillFloorPattern(
+        ctx,
+        { minX: tx(minX), minY: ty(minY), maxX: tx(maxX), maxY: ty(maxY) },
+        pxPerM,
+        {
+          pattern: floorSel?.pattern ?? 'gerade',
+          direction: floorSel?.layingDirection,
+          base: floorMat.texture.base,
+          grain: floorMat.texture.grain ?? floorMat.texture.base,
+          tile: isTile,
+          groutColor: floorSel?.groutColor,
+          unitM: isTile ? 0.6 : floorSel?.pattern === 'fischgraet' || floorSel?.pattern === 'chevron' ? 0.6 : 1.2,
+        },
+      );
     } else {
       // Fallback: dezente neutrale Bodenfarbe (nie leer, nie knallig).
       ctx.fillStyle = '#E7E2D7';
@@ -109,7 +119,7 @@ export function RealisticPlan({
     for (let i = 0; i < pts.length; i++) {
       const a = pts[i];
       const b = pts[(i + 1) % pts.length];
-      const color = resolveWallColorHex(variant, i);
+      const color = wallColor(variant, i);
       ctx.strokeStyle = color;
       ctx.lineWidth = wallPx;
       ctx.beginPath();
@@ -213,4 +223,21 @@ export function RealisticPlan({
       aria-label="Realistische 2D-Ansicht"
     />
   );
+}
+
+/** Farbe einer Wand: explizite Wandfarbe → Wandmaterial → Wand-Rolle → dezente Linie. */
+function wallColor(variant: Variant, wallIndex: number): string {
+  const explicit = variant.wallColors?.[wallIndex];
+  if (explicit) {
+    const tone = findTone(explicit);
+    if (tone) return tone.hex;
+  }
+  const wallMat = variant.materials.find((m) => m.surface === 'wand' && m.wallIndex === wallIndex);
+  if (wallMat) {
+    const mat = findMaterial(wallMat.materialId);
+    if (mat) return mat.texture.base;
+  }
+  const wandTone = findTone(variant.colorRoles.wand);
+  if (wandTone) return wandTone.hex;
+  return '#2a2622';
 }

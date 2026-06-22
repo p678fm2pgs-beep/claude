@@ -98,9 +98,3 @@ dem Backend. Passwörter werden nur als Hash gespeichert; bei Verlust hilft auss
 - **Realistische Ansicht:** `src/components/RealisticPlan.tsx`; Umschalter im Raum-Editor
   (Technischer Plan ⇄ Realistische Ansicht). Der technische `MiniPlan` bleibt erhalten.
 - **Regeln:** rein additiv arbeiten — `src/test/no-regression.test.ts` schützt die Baselines.
-
-## 3D-Ansicht (three.js)
-
-Im Raum-Editor neben `Technischer Plan` und `Realistische Ansicht` der Schalter **`3D`**:
-extrudierte Wände (Türen/Fenster ausgespart), Wandfarben/-materialien, Boden mit Verlegemuster,
-Orbit per Maus. three.js (MIT) ist lokal gebündelt und wird erst bei Bedarf geladen (Code-Splitting).

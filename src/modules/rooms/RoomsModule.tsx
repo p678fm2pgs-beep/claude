@@ -1,12 +1,10 @@
-import { lazy, Suspense, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useStore } from '../../store/useStore';
 import { useT } from '../../hooks';
 import { PageHeader, EmptyState, Field, Badge } from '../../components/ui';
 import { MiniPlan } from '../../components/MiniPlan';
 import { getRoom, getActiveVariant } from '../roomHelpers';
 import { RealisticPlan } from '../../components/RealisticPlan';
-// three.js wird erst geladen, wenn die 3D-Ansicht geöffnet wird (Code-Splitting).
-const Room3D = lazy(() => import('../../components/Room3D').then((m) => ({ default: m.Room3D })));
 import { createRoom } from '../../lib/factory';
 import { uid } from '../../lib/id';
 import { deriveAreas, rectanglePoints, lShapePoints, wallLengthCm, CM_PER_M } from '../../lib/geometry';
@@ -219,7 +217,7 @@ function RoomEditor({
   const [depthStr, setDepthStr] = useState(((Math.max(...room.floorplan.points.map((p) => p.y)) - Math.min(...room.floorplan.points.map((p) => p.y))) / CM_PER_M).toFixed(2));
   const [heightStr, setHeightStr] = useState((room.heightCm / CM_PER_M).toFixed(2));
   const [heightErr, setHeightErr] = useState<string | undefined>();
-  const [planView, setPlanView] = useState<'technisch' | 'realistisch' | 'dreidimensional'>('technisch');
+  const [planView, setPlanView] = useState<'technisch' | 'realistisch'>('technisch');
 
   const applyRectangle = () => {
     const w = parseLocaleNumber(widthStr);
@@ -293,13 +291,6 @@ function RoomEditor({
             >
               {t('plan.realistic')}
             </button>
-            <button
-              className={`px-2.5 py-1 text-xs border rounded ${planView === 'dreidimensional' ? 'border-gold text-gold' : 'border-line text-muted'}`}
-              onClick={() => setPlanView('dreidimensional')}
-              data-testid="plan-3d"
-            >
-              {t('plan.threeD')}
-            </button>
           </div>
           <span className="eyebrow">{t('rooms.title')}</span>
           <div className="flex gap-1">
@@ -312,24 +303,14 @@ function RoomEditor({
           </div>
         </div>
         <div className="board-surface rounded p-3">
-          {planView === 'dreidimensional' && variant ? (
-            <Suspense fallback={<div style={{ width: 560, height: 360 }} className="flex items-center justify-center text-[#6b6256] text-sm">3D…</div>}>
-              <Room3D room={room} variant={variant} width={560} height={360} />
-            </Suspense>
-          ) : planView === 'realistisch' && variant ? (
+          {planView === 'realistisch' && variant ? (
             <RealisticPlan room={room} variant={variant} width={560} height={360} showDimensions />
           ) : (
             <MiniPlan plan={room.floorplan} heightCm={room.heightCm} width={560} height={360} showDimensions />
           )}
           <div className="flex items-center gap-2 mt-2 text-[#6b6256] text-xs">
-            {planView === 'dreidimensional' ? (
-              <span>{t('plan.orbitHint')}</span>
-            ) : (
-              <>
-                <div className="h-px bg-[#1A1814] w-12" />
-                <span>1,00 m</span>
-              </>
-            )}
+            <div className="h-px bg-[#1A1814] w-12" />
+            <span>1,00 m</span>
           </div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 text-center">

@@ -117,9 +117,6 @@ export const de: Record<string, string> = {
   'rooms.wallLength': 'Wandlänge',
   'plan.technical': 'Technischer Plan',
   'plan.realistic': 'Realistische Ansicht',
-  'plan.threeD': '3D',
-  'plan.orbitHint': 'Mit der Maus drehen · scrollen zum Zoomen',
-  'plan.no3d': '3D-Ansicht in diesem Browser nicht verfügbar (WebGL fehlt).',
 
   // Beleuchtung (Erweiterung 4)
   'lighting.title': 'Beleuchtung',

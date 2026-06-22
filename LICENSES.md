@@ -49,17 +49,3 @@ und können je Material in `src/data/materials.ts` hinterlegt werden.
 
 RAL/NCS sowie Hersteller-Codes (Farrow & Ball, Little Greene, Caparol, Alpina) in
 `src/data/colors.ts` sind **Annäherungen** — verbindlich nur der Original-Farbfächer des Herstellers.
-
-## three.js (3D-Raumansicht)
-
-- **three.js** (`three`, `@types/three`) — **MIT License** (© three.js authors / mrdoob).
-  Lokal als npm-Abhängigkeit gebündelt, kein CDN/Laufzeit-Request. Wird per Code-Splitting erst
-  geladen, wenn die 3D-Ansicht geöffnet wird. WebGL-Canvas, offline lauffähig.
-
-## Erweiterung 5 — 3D-Realismus
-
-- **three.js `RoomEnvironment`** (MIT, Teil von three.js) — prozedural erzeugtes Studio-Environment für
-  Image-Based Lighting; **kein externer HDRI-Download**, vollständig offline.
-- Fenster-Glas: `MeshPhysicalMaterial` (transmission) — stilisierte Echtzeit-Verglasung.
-- Hinweis Visualisierung: Die 3D-Ansicht ist eine **stilisierte Echtzeit-Visualisierung**; Farben/
-  Materialien sind bildschirmabhängig — verbindlich sind ausschließlich die Originalmuster (RAL/NCS).

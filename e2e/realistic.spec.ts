@@ -24,12 +24,6 @@ test('Showcase „Musterwohnzimmer": technischer ⇄ realistischer Plan, Muster 
   const box = await canvas.boundingBox();
   expect(box?.width ?? 0).toBeGreaterThan(100);
 
-  // 3D-Ansicht (three.js, on-demand geladen)
-  await editor.getByTestId('plan-3d').click();
-  await expect(editor.getByTestId('room-3d')).toBeVisible({ timeout: 15000 });
-  // WebGL-Canvas wurde gemountet
-  await expect(editor.locator('[data-testid="room-3d"] canvas')).toBeVisible();
-
   // Zurück auf technisch (additiv erhalten)
   await editor.getByTestId('plan-technisch').click();
   await expect(editor.getByTestId('floorplan-svg')).toBeVisible();

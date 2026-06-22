@@ -28,13 +28,7 @@ export function MaterialsModule({ roomId }: { roomId: string }) {
     updateProject((p) => {
       const r = p.rooms.find((x) => x.id === roomId);
       const v = r?.variants.find((x) => x.id === r.activeVariantId);
-      if (!v) return;
-      // Einzel-Flächen (Boden/Decke) sind je Raum eindeutig → bestehende Auswahl ersetzen,
-      // damit die getroffene Wahl auch wirklich angezeigt wird (Fix Material-Darstellung).
-      if (m.surface === 'boden' || m.surface === 'decke') {
-        v.materials = v.materials.filter((s) => s.surface !== m.surface);
-      }
-      v.materials.push({ id: uid('ms'), materialId: m.id, surface: m.surface, tier: 'premium' });
+      if (v) v.materials.push({ id: uid('ms'), materialId: m.id, surface: m.surface, tier: 'premium' });
     });
 
   const removeSelection = (selId: string) =>
