@@ -5,7 +5,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import type { Orientation, Room, Variant } from '../types';
 import { computeWallPanels } from '../lib/room3d';
 import { computeOpeningParts, type OpeningPartKind } from '../lib/openings3d';
-import { fillFloorPattern } from '../lib/texture';
+import { fillFloorSurface } from '../lib/texture';
 import { resolveFloorSelection, resolveMaterial, resolveWallColorHex } from '../lib/materialResolve';
 import { useT } from '../hooks';
 
@@ -132,14 +132,12 @@ export function Room3D({
       cnv.height = cw;
       const ctx = cnv.getContext('2d');
       if (ctx) {
-        fillFloorPattern(ctx, { minX: 0, minY: 0, maxX: cw, maxY: cw }, pxPerM, {
-          pattern: floorSel?.pattern ?? 'gerade',
+        // Gleiche korrekte Material-Darstellung wie 2D & Katalog-Kachel.
+        fillFloorSurface(ctx, { minX: 0, minY: 0, maxX: cw, maxY: cw }, pxPerM, {
+          texture: floorMat.texture,
+          pattern: floorSel?.pattern,
           direction: floorSel?.layingDirection,
-          base: floorMat.texture.base,
-          grain: floorMat.texture.grain ?? floorMat.texture.base,
-          tile: isTile,
           groutColor: floorSel?.groutColor,
-          unitM: isTile ? 0.6 : floorSel?.pattern === 'fischgraet' || floorSel?.pattern === 'chevron' ? 0.6 : 1.2,
         });
       }
       const tex = new THREE.CanvasTexture(cnv);

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { Room, Variant } from '../types';
 import { wallLengthCm } from '../lib/geometry';
-import { fillFloorPattern } from '../lib/texture';
+import { fillFloorSurface } from '../lib/texture';
 import { resolveFloorSelection, resolveMaterial, resolveWallColorHex } from '../lib/materialResolve';
 import { findFixture } from '../data/lighting';
 
@@ -67,21 +67,12 @@ export function RealisticPlan({
     ctx.closePath();
     ctx.clip();
     if (floorMat) {
-      const isTile = floorMat.texture.variant === 'tile' || floorMat.texture.variant === 'stone';
-      fillFloorPattern(
-        ctx,
-        { minX: tx(minX), minY: ty(minY), maxX: tx(maxX), maxY: ty(maxY) },
-        pxPerM,
-        {
-          pattern: floorSel?.pattern ?? 'gerade',
-          direction: floorSel?.layingDirection,
-          base: floorMat.texture.base,
-          grain: floorMat.texture.grain ?? floorMat.texture.base,
-          tile: isTile,
-          groutColor: floorSel?.groutColor,
-          unitM: isTile ? 0.6 : floorSel?.pattern === 'fischgraet' || floorSel?.pattern === 'chevron' ? 0.6 : 1.2,
-        },
-      );
+      fillFloorSurface(ctx, { minX: tx(minX), minY: ty(minY), maxX: tx(maxX), maxY: ty(maxY) }, pxPerM, {
+        texture: floorMat.texture,
+        pattern: floorSel?.pattern,
+        direction: floorSel?.layingDirection,
+        groutColor: floorSel?.groutColor,
+      });
     } else {
       // Fallback: dezente neutrale Bodenfarbe (nie leer, nie knallig).
       ctx.fillStyle = '#E7E2D7';

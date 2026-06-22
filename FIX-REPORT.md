@@ -36,3 +36,19 @@ Gegenproben (maschinell): keine fehlenden Material-IDs, kein ungültiger `textur
 Keine. Alle referenzierten Materialien lösen auf (Diagnose-Lauf bestätigt).
 
 Backup-Tag: `backup-vor-materialfix`.
+
+---
+
+## Nachtrag — Fix 2: Boden-Parität (Katalog-Kachel ↔ dargestellter Boden)
+Nach erneuter Meldung zweite Ursache gefunden & behoben: Der gerenderte Boden nutzte `fillFloorPattern`
+(kennt nur Holzdielen/Fliesenraster), die Katalog-Kachel jedoch `drawTexture` (alle Material-Varianten).
+→ Nicht-Holz/Nicht-Fliesen-Böden (Mikrozement, Linoleum, Teppich, Putz, Gussboden, Metall …) erschienen
+als **Holzdielen** = „komplett anderes Material" (fast alle betroffen, auch bei Einzel-Auswahl).
+
+**Geändert:** neue gemeinsame `fillFloorSurface` (routet nach `texture.variant`); `RealisticPlan` & `Room3D`
+nutzen sie ausschließlich. Holz → Verlegemuster, Fliese/Stein → Raster+Fugen, Rest → exakt die
+Katalog-Kachel-Optik. Fallback = korrekte Materialfarbe + (bei fehlendem Material) `console.warn`.
+
+**Tests:** `src/lib/floorSurface.test.ts` (3) — alle Textur-Varianten & alle Katalog-Böden rendern ohne
+Fehler; Holz-Verlegemuster akzeptiert. `e2e/material-fix.spec.ts` (dunkel≠hell, 2D & 3D) unverändert gültig.
+`npm run verify` GRÜN.

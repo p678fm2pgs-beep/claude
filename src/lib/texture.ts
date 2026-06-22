@@ -456,6 +456,83 @@ function fillTileGrid(
   }
 }
 
+/**
+ * Füllt den Boden flächendeckend mit der KORREKTEN Darstellung des gewählten Materials.
+ * Behebt die Parität „Katalog-Kachel ↔ dargestellter Boden": Holz → Verlegemuster,
+ * Fliese/Stein → Raster+Fugen, alle anderen (Putz/Beton/Mikrozement/Teppich/Linoleum/…)
+ * → dieselbe `drawTexture`-Optik wie die Katalog-Kachel (gekachelt), NICHT als Holzdielen.
+ */
+export function fillFloorSurface(
+  ctx: CanvasRenderingContext2D,
+  bbox: { minX: number; minY: number; maxX: number; maxY: number },
+  pxPerM: number,
+  opts: {
+    texture: Texture;
+    pattern?: string;
+    direction?: 'laengs' | 'quer' | 'diagonal';
+    groutColor?: string;
+  },
+): void {
+  const variant = opts.texture.variant;
+  const base = opts.texture.base;
+  const grain = opts.texture.grain ?? base;
+
+  if (variant === 'wood') {
+    const isPattern = opts.pattern === 'fischgraet' || opts.pattern === 'chevron';
+    fillFloorPattern(ctx, bbox, pxPerM, {
+      pattern: opts.pattern ?? 'gerade',
+      direction: opts.direction,
+      base,
+      grain,
+      tile: false,
+      unitM: isPattern ? 0.6 : 1.2,
+    });
+    return;
+  }
+  if (variant === 'tile' || variant === 'stone') {
+    fillFloorPattern(ctx, bbox, pxPerM, {
+      pattern: 'gerade',
+      base,
+      grain,
+      tile: true,
+      groutColor: opts.groutColor,
+      unitM: 0.6,
+    });
+    return;
+  }
+
+  // Übrige Materialien: gleiche Optik wie die Katalog-Kachel (drawTexture), gekachelt.
+  const w = bbox.maxX - bbox.minX;
+  const h = bbox.maxY - bbox.minY;
+  const tilePx = Math.max(64, Math.min(512, Math.round(1.2 * pxPerM)));
+  let filled = false;
+  try {
+    const tile = document.createElement('canvas');
+    tile.width = tilePx;
+    tile.height = tilePx;
+    const tctx = tile.getContext('2d');
+    if (tctx) {
+      drawTexture(tctx, tilePx, tilePx, opts.texture);
+      const pattern = ctx.createPattern(tile, 'repeat');
+      if (pattern) {
+        ctx.save();
+        ctx.fillStyle = pattern;
+        ctx.translate(bbox.minX, bbox.minY);
+        ctx.fillRect(0, 0, w, h);
+        ctx.restore();
+        filled = true;
+      }
+    }
+  } catch {
+    /* Fallback unten */
+  }
+  if (!filled) {
+    // dezente, korrekte Materialfarbe (kein irreführend helles Standardbild)
+    ctx.fillStyle = base;
+    ctx.fillRect(bbox.minX, bbox.minY, w, h);
+  }
+}
+
 /** Erzeugt eine Data-URL der Textur (für PDF / <img>). */
 export function textureDataUrl(texture: Texture, w = 240, h = 160): string {
   const canvas = document.createElement('canvas');

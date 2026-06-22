@@ -37,3 +37,22 @@ Zentrale Resolver-Schicht `src/lib/materialResolve.ts`:
 
 Zusätzlich (Konsistenz, minimal): `addMaterial` ersetzt bei Einzel-Flächen (Boden/Decke) die bestehende
 Auswahl statt anzuhängen; Wand bleibt pro-Wand additiv.
+
+---
+
+## Nachtrag — ZWEITE Ursache (Re-Untersuchung nach erneuter Meldung)
+Auch bei **einzelner** Bodenauswahl falsch dargestellt → die „erste-vs-letzte"-Ursache erklärt nicht alles.
+Beleg: Die **Katalog-Kachel** (Auswahl) wird mit `drawTexture(material.texture)` gezeichnet (kennt
+`texture.variant`: wood/stone/tile/plaster/textile/carpet/metal/solid). Der **dargestellte Boden** (2D & 3D)
+nutzte dagegen `fillFloorPattern`, das **nur Holzdielen oder Fliesenraster** kann. Folge: Mikrozement,
+Linoleum, Teppich, Putz, Gussboden, Metalle u. a. wurden als **Holzdielen** gerendert → „komplett anderes
+Material" (betrifft fast alle Nicht-Holz/Nicht-Fliesen-Böden). Gemeinsame Stelle, 2D & 3D betroffen.
+
+### Fix 2 (Wurzel, gemeinsam)
+Neue Funktion `fillFloorSurface(ctx, bbox, pxPerM, { texture, pattern, direction, groutColor })` in
+`src/lib/texture.ts` routet nach `texture.variant`:
+- **wood** → Verlegemuster (Diele/Fischgräte/Chevron …),
+- **tile/stone** → Raster + Fugen,
+- **alle übrigen** → **dieselbe `drawTexture`-Optik wie die Katalog-Kachel** (gekachelt) → Anzeige = Auswahl.
+2D (`RealisticPlan`) und 3D (`Room3D`) rufen jetzt ausschließlich `fillFloorSurface` → automatisch beide korrekt.
+Fallback (kein Pattern/Canvas) füllt die **korrekte Materialbasisfarbe**, kein irreführend helles Standardbild.
