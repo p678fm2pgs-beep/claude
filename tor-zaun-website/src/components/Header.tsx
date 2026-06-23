@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { company } from '../data/company';
+import { Logo } from './Logo';
 
 const nav = [
   { to: '/', label: 'Start', end: true },
@@ -20,7 +21,7 @@ export function Header() {
     <header className="sticky top-0 z-40 border-b border-line bg-paper/95 backdrop-blur">
       <div className="container-x flex items-center justify-between gap-4 py-3">
         <Link to="/" className="flex items-center gap-2" aria-label={`${company.name} – zur Startseite`}>
-          <img src="/favicon.svg" alt="" width={36} height={36} />
+          <Logo className="h-9 w-9" />
           <span className="font-serif text-lg font-semibold text-anthracite sm:text-xl">
             A-Z Tor &amp; Zaun
           </span>
