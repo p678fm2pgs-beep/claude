@@ -113,6 +113,7 @@ export const en: Record<string, string> = {
   'plan.realistic': 'Realistic view',
   'plan.threeD': '3D',
   'plan.orbitHint': 'Drag to rotate · scroll to zoom',
+  'plan.ceiling': 'Ceiling',
   'plan.no3d': '3D view not available in this browser (WebGL missing).',
 
   // Lighting (Extension 4)

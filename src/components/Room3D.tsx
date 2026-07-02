@@ -19,11 +19,13 @@ export function Room3D({
   variant,
   width = 560,
   height = 380,
+  showCeiling = false,
 }: {
   room: Room;
   variant: Variant;
   width?: number;
   height?: number;
+  showCeiling?: boolean;
 }) {
   const t = useT();
   const mountRef = useRef<HTMLDivElement>(null);
@@ -143,9 +145,11 @@ export function Room3D({
 
     // ── Wände (pro Wand Farbe) + gefüllte Öffnungen (S7d: keine leeren Löcher) ──
     const wallThickness = 0.1;
+    // S7e: verdeckende Wände im Orbit ausblenden — pro Wand Materialien + Außennormale sammeln.
+    const wallFade: { center: THREE.Vector3; normal: THREE.Vector3; mats: { m: THREE.Material; base: number }[] }[] = [];
     const partMatCache = new Map<string, THREE.Material>();
     const partMaterial = (kind: OpeningPartKind, frameColor?: string): THREE.Material => {
-      const key = `${kind}:${frameColor ?? ''}`;
+      const key = `${kind}:${frameColor ?? ''}`; // Hinweis: Fade übernimmt die Wandgruppe unten
       const cached = partMatCache.get(key);
       if (cached) return cached;
       let m: THREE.Material;
@@ -173,8 +177,13 @@ export function Room3D({
       const uz = ez / len;
       const angle = Math.atan2(-ez, ex);
       const colorHex = resolveWallColorHex(variant, i);
-      const wallMaterial = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.9 });
+      const wallMaterial = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.9, transparent: true });
       disposables.push(wallMaterial);
+      const wallCenter = new THREE.Vector3((A.x + B.x) / 2, Hm / 2, (A.z + B.z) / 2);
+      let normal = new THREE.Vector3(uz, 0, -ux);
+      if (normal.dot(new THREE.Vector3(wallCenter.x, 0, wallCenter.z)) < 0) normal = normal.multiplyScalar(-1);
+      const fadeGroup = { center: wallCenter, normal, mats: [{ m: wallMaterial as THREE.Material, base: 1 }] };
+      wallFade.push(fadeGroup);
 
       const panels = computeWallPanels(room.floorplan, i, room.heightCm);
       for (const p of panels) {
@@ -201,7 +210,10 @@ export function Room3D({
           if (w <= 0 || h <= 0) continue;
           const geo = new THREE.BoxGeometry(w, h, part.depthCm / 100);
           disposables.push(geo);
-          const mesh = new THREE.Mesh(geo, partMaterial(part.kind, o.frameColor));
+          const pm = partMaterial(part.kind, o.frameColor);
+          (pm as THREE.Material).transparent = true;
+          if (!fadeGroup.mats.some((x) => x.m === pm)) fadeGroup.mats.push({ m: pm, base: (pm as THREE.MeshPhysicalMaterial).opacity ?? 1 });
+          const mesh = new THREE.Mesh(geo, pm);
           if (part.kind !== 'glass') {
             mesh.castShadow = true;
             mesh.receiveShadow = true;
@@ -212,6 +224,22 @@ export function Room3D({
           scene.add(mesh);
         }
       }
+    }
+
+    // ── Decke (S7e, einblendbar) ──
+    if (showCeiling) {
+      const ceilGeo = floorGeo.clone();
+      ceilGeo.translate(0, Hm, 0);
+      disposables.push(ceilGeo);
+      const deckeSel = variant.materials.filter((m) => m.surface === 'decke').pop();
+      const deckeMat = resolveMaterial(deckeSel);
+      const ceilMaterial = new THREE.MeshStandardMaterial({
+        color: deckeMat?.texture.base ?? '#F2F0EA',
+        roughness: 0.95,
+        side: THREE.DoubleSide,
+      });
+      disposables.push(ceilMaterial);
+      scene.add(new THREE.Mesh(ceilGeo, ceilMaterial));
     }
 
     // ── Steuerung ──
@@ -228,6 +256,14 @@ export function Room3D({
     const animate = () => {
       raf = requestAnimationFrame(animate);
       controls.update();
+      // S7e: Wände zwischen Kamera und Raum dezent ausblenden (freie Sicht im Orbit).
+      for (const g of wallFade) {
+        const toCam = new THREE.Vector3().subVectors(camera.position, g.center);
+        const occluding = g.normal.dot(toCam) > 0 && camera.position.y < Hm * 2.2;
+        for (const e of g.mats) {
+          (e.m as THREE.MeshStandardMaterial).opacity = occluding ? Math.min(e.base, 0.14) : e.base;
+        }
+      }
       renderer.render(scene, camera);
     };
     animate();
@@ -239,7 +275,7 @@ export function Room3D({
       renderer.dispose();
       if (renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement);
     };
-  }, [room, variant, width, height]);
+  }, [room, variant, width, height, showCeiling]);
 
   if (failed) {
     return (

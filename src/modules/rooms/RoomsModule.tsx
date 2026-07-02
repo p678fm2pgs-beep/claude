@@ -220,6 +220,7 @@ function RoomEditor({
   const [heightStr, setHeightStr] = useState((room.heightCm / CM_PER_M).toFixed(2));
   const [heightErr, setHeightErr] = useState<string | undefined>();
   const [planView, setPlanView] = useState<'technisch' | 'realistisch' | 'dreidimensional'>('technisch');
+  const [showCeiling, setShowCeiling] = useState(false);
 
   const applyRectangle = () => {
     const w = parseLocaleNumber(widthStr);
@@ -300,6 +301,15 @@ function RoomEditor({
             >
               {t('plan.threeD')}
             </button>
+            {planView === 'dreidimensional' && (
+              <button
+                className={`px-2.5 py-1 text-xs border rounded ${showCeiling ? 'border-gold text-gold' : 'border-line text-muted'}`}
+                onClick={() => setShowCeiling((v) => !v)}
+                data-testid="plan-ceiling"
+              >
+                {t('plan.ceiling')}
+              </button>
+            )}
           </div>
           <span className="eyebrow">{t('rooms.title')}</span>
           <div className="flex gap-1">
@@ -314,7 +324,7 @@ function RoomEditor({
         <div className="board-surface rounded p-3">
           {planView === 'dreidimensional' && variant ? (
             <Suspense fallback={<div style={{ width: 560, height: 360 }} className="flex items-center justify-center text-[#6b6256] text-sm">3D…</div>}>
-              <Room3D room={room} variant={variant} width={560} height={360} />
+              <Room3D room={room} variant={variant} width={560} height={360} showCeiling={showCeiling} />
             </Suspense>
           ) : planView === 'realistisch' && variant ? (
             <RealisticPlan room={room} variant={variant} width={560} height={360} showDimensions />
