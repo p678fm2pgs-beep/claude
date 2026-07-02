@@ -47,7 +47,8 @@ export function Room3D({
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.05;
-    renderer.shadowMap.enabled = false;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     mount.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
@@ -70,14 +71,22 @@ export function Room3D({
     const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 100);
     camera.position.set(span * 0.9, span * 1.0 + Hm, span * 1.1);
 
-    // ── Licht ──
-    scene.add(new THREE.AmbientLight(0xffffff, 0.85));
-    const dir = new THREE.DirectionalLight(0xfff4e0, 0.9);
+    // ── Licht (S7b): weiches Grundlicht + EIN gerichtetes Licht mit weichen Schatten ──
+    scene.add(new THREE.HemisphereLight(0xffffff, 0xb9b2a4, 0.9));
+    const dir = new THREE.DirectionalLight(0xfff4e0, 1.6);
     dir.position.set(span, span * 2 + 2, span * 0.6);
+    dir.castShadow = true;
+    dir.shadow.mapSize.set(2048, 2048);
+    const sr = span * 1.3 + 1;
+    dir.shadow.camera.left = -sr;
+    dir.shadow.camera.right = sr;
+    dir.shadow.camera.top = sr;
+    dir.shadow.camera.bottom = -sr;
+    dir.shadow.camera.near = 0.5;
+    dir.shadow.camera.far = span * 6 + 8;
+    dir.shadow.bias = -0.0004;
+    dir.shadow.normalBias = 0.02;
     scene.add(dir);
-    const fill = new THREE.DirectionalLight(0xdfe6ff, 0.35);
-    fill.position.set(-span, span, -span);
-    scene.add(fill);
 
     // ── Boden mit Material/Verlegemuster ──
     const shape = new THREE.Shape();
@@ -127,7 +136,9 @@ export function Room3D({
       floorMaterial = new THREE.MeshStandardMaterial({ color: '#D9D2C4', roughness: 0.9 });
     }
     disposables.push(floorMaterial);
-    scene.add(new THREE.Mesh(floorGeo, floorMaterial));
+    const floorMesh = new THREE.Mesh(floorGeo, floorMaterial);
+    floorMesh.receiveShadow = true;
+    scene.add(floorMesh);
 
     // ── Wände (pro Wand Farbe; Öffnungen ausgespart) ──
     const wallThickness = 0.1;
@@ -153,6 +164,8 @@ export function Room3D({
         const geo = new THREE.BoxGeometry(w, h, wallThickness);
         disposables.push(geo);
         const mesh = new THREE.Mesh(geo, wallMaterial);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
         mesh.position.set(A.x + ux * along, (p.y0 + p.y1) / 200, A.z + uz * along);
         mesh.rotation.y = angle;
         scene.add(mesh);
