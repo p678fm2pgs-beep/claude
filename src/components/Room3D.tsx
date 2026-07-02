@@ -43,6 +43,10 @@ export function Room3D({
     }
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // S7a: korrekter Ausgabe-Farbraum + filmisches Tone-Mapping (satte, echte Farben).
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
     renderer.shadowMap.enabled = false;
     mount.appendChild(renderer.domElement);
 
