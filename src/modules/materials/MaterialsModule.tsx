@@ -3,6 +3,7 @@ import { useStore } from '../../store/useStore';
 import { useT } from '../../hooks';
 import { PageHeader, Badge } from '../../components/ui';
 import { TextureSwatch } from '../../components/TextureSwatch';
+import { SurfaceFlow } from './SurfaceFlow';
 import { getRoom, getActiveVariant } from '../roomHelpers';
 import { MATERIALS, MATERIAL_CATEGORIES, findMaterial, type Material } from '../../data/materials';
 import { findAddon } from '../../data/addons';
@@ -69,6 +70,11 @@ export function MaterialsModule({ roomId }: { roomId: string }) {
         ))}
       </div>
 
+      {category === 'Böden' ? (
+        <SurfaceFlow roomId={roomId} surface="boden" />
+      ) : category === 'Wände' ? (
+        <SurfaceFlow roomId={roomId} surface="wand" />
+      ) : (
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" data-testid="material-grid">
         {list.map((m) => {
           const warns = allWarnings(m, room.type, room.heightCm);
@@ -92,6 +98,7 @@ export function MaterialsModule({ roomId }: { roomId: string }) {
           );
         })}
       </div>
+      )}
 
       {/* Gewählte Materialien */}
       <div className="mt-8">
