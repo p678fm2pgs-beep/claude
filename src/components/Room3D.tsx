@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { Room, Variant } from '../types';
 import { computeWallPanels } from '../lib/room3d';
+import { computeOpeningParts, type OpeningPartKind } from '../lib/openings3d';
 import { fillFloorSurface } from '../lib/texture';
 import { resolveFloorSelection, resolveMaterial, resolveWallColorHex } from '../lib/materialResolve';
 import { useT } from '../hooks';
@@ -140,8 +141,28 @@ export function Room3D({
     floorMesh.receiveShadow = true;
     scene.add(floorMesh);
 
-    // ── Wände (pro Wand Farbe; Öffnungen ausgespart) ──
+    // ── Wände (pro Wand Farbe) + gefüllte Öffnungen (S7d: keine leeren Löcher) ──
     const wallThickness = 0.1;
+    const partMatCache = new Map<string, THREE.Material>();
+    const partMaterial = (kind: OpeningPartKind, frameColor?: string): THREE.Material => {
+      const key = `${kind}:${frameColor ?? ''}`;
+      const cached = partMatCache.get(key);
+      if (cached) return cached;
+      let m: THREE.Material;
+      if (kind === 'glass') {
+        m = new THREE.MeshPhysicalMaterial({
+          color: '#cfe0e6', roughness: 0.08, metalness: 0,
+          transparent: true, opacity: 0.35,
+        });
+      } else if (kind === 'leaf') {
+        m = new THREE.MeshStandardMaterial({ color: frameColor ?? '#b98c5a', roughness: 0.55 });
+      } else {
+        m = new THREE.MeshStandardMaterial({ color: frameColor ?? '#2b2b2b', roughness: 0.5, metalness: 0.3 });
+      }
+      disposables.push(m);
+      partMatCache.set(key, m);
+      return m;
+    };
     for (let i = 0; i < pts.length; i++) {
       const A = { x: mapX(pts[i].x), z: mapZ(pts[i].y) };
       const B = { x: mapX(pts[(i + 1) % pts.length].x), z: mapZ(pts[(i + 1) % pts.length].y) };
@@ -169,6 +190,27 @@ export function Room3D({
         mesh.position.set(A.x + ux * along, (p.y0 + p.y1) / 200, A.z + uz * along);
         mesh.rotation.y = angle;
         scene.add(mesh);
+      }
+
+      // Öffnungen dieser Wand mit Rahmen/Glas/Türblatt füllen
+      const wallLenCm = len * 100;
+      for (const o of room.floorplan.openings.filter((op) => op.wallIndex === i)) {
+        for (const part of computeOpeningParts(o, wallLenCm, room.heightCm)) {
+          const w = (part.x1 - part.x0) / 100;
+          const h = (part.y1 - part.y0) / 100;
+          if (w <= 0 || h <= 0) continue;
+          const geo = new THREE.BoxGeometry(w, h, part.depthCm / 100);
+          disposables.push(geo);
+          const mesh = new THREE.Mesh(geo, partMaterial(part.kind, o.frameColor));
+          if (part.kind !== 'glass') {
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+          }
+          const along = (part.x0 + part.x1) / 200;
+          mesh.position.set(A.x + ux * along, (part.y0 + part.y1) / 200, A.z + uz * along);
+          mesh.rotation.y = angle;
+          scene.add(mesh);
+        }
       }
     }
 
