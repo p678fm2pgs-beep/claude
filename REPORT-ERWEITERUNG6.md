@@ -1,7 +1,7 @@
 # ERWEITERUNG 6 — „SIGNATURE-AUSBAU" · Abschlussbericht
 
 Branch: `claude/haven-atelier-build-37c8rb` · Backup-Tag: `vor-erweiterung6`
-Prüfstand bei Abgabe: **TypeScript strict, ESLint, Vitest (170 Tests), Production-Build — alles grün.**
+Prüfstand bei Abgabe: **TypeScript strict, ESLint, Vitest (182 Tests in 25 Dateien), Production-Build — alles grün.**
 
 ## Was umgesetzt wurde (je Schritt eigener Commit, jeweils verify-grün)
 
@@ -51,7 +51,7 @@ Umgesetzt ist stattdessen die bestehende **prozedurale Textur-Pipeline** in best
 
 ## Prüfprotokoll (Abgabe)
 
-- `npm run verify`: Typecheck ✔ · ESLint ✔ · Vitest ✔ (170 Tests) · Build ✔
+- `npm run verify`: Typecheck ✔ · ESLint ✔ · Vitest ✔ (182 Tests) · Build ✔
 - Neue dauerhafte Beweis-Suiten: `colorCatalog` (19), `integrity-sweep` (5),
   `signatureLooks` (7), `musterbrett` (5), `budget` (3), `materialPass` (4), `sampleList` (6).
 - `no-regression.test.ts`: unverändert grün (Baselines nur nach oben bewegt).
