@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useStore } from '../../store/useStore';
 import { useT } from '../../hooks';
 import { PageHeader, EmptyState, Badge } from '../../components/ui';
+import { BudgetSlider } from './BudgetSlider';
 import { computeProjectCost } from '../../lib/projectCost';
 import { formatEUR } from '../../lib/format';
 import type { Gewerk } from '../../lib/costs';
@@ -36,6 +37,8 @@ export function CostsModule() {
       ) : (
         <div className="grid lg:grid-cols-[1fr_340px] gap-6">
           <div>
+            {/* Live-Budget (Erweiterung 6 · S10) */}
+            <BudgetSlider />
             {/* Räume */}
             <div className="space-y-3" data-testid="cost-rooms">
               {cost.rooms.map((rc) => {

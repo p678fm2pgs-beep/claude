@@ -297,6 +297,12 @@ export const de: Record<string, string> = {
 
   // Costs
   'costs.title': 'Kostenschätzung',
+  'budget.title': 'Live-Budget',
+  'budget.grossApprox': 'Brutto (Mitte der Spanne, animiert)',
+  'budget.apply': 'Stufe übernehmen',
+  'budget.confirmTitle': 'Preisstufe übernehmen?',
+  'budget.confirmBody':
+    'Setzt die Preisstufe ALLER Material- und Möbel-Auswahlen des Projekts auf „{tier}“. Auswahlen selbst, Farben, Gewerke und Notizen bleiben unverändert.',
   'costs.position': 'Position',
   'costs.qty': 'Menge',
   'costs.unit': 'Einheit',

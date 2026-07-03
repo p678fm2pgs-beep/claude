@@ -281,6 +281,12 @@ export const en: Record<string, string> = {
   'trades.elektro': 'Smart home & electrical',
 
   'costs.title': 'Cost estimate',
+  'budget.title': 'Live budget',
+  'budget.grossApprox': 'Gross (middle of range, animated)',
+  'budget.apply': 'Apply tier',
+  'budget.confirmTitle': 'Apply price tier?',
+  'budget.confirmBody':
+    'Sets the price tier of ALL material and furniture selections in this project to “{tier}”. Selections themselves, colours, trades and notes remain unchanged.',
   'costs.position': 'Item',
   'costs.qty': 'Qty',
   'costs.unit': 'Unit',
