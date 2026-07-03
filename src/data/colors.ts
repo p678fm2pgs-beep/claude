@@ -6,6 +6,9 @@
  * Hinweis: RAL/NCS sind Annäherungen — verbindlich nur das physische Originalmuster.
  */
 import type { Untertone } from '../types';
+import { RAL_CLASSIC } from './ralClassic';
+import { NCS_TONES } from './ncs';
+import { EXTENDED_FAMILY_TONES } from './colorsExtended';
 
 export interface ColorTone {
   id: string;
@@ -336,17 +339,148 @@ export const MANUFACTURER_COLLECTIONS: ManufacturerCollection[] = [
       ['Olivton', 'Oliv', '#73754F', 'RAL 6013', 22, 'warm'],
     ]),
   },
+  {
+    id: 'schoener-wohnen',
+    manufacturer: 'Schöner Wohnen',
+    colors: mc('sw', [
+      ['Naturell Muschelweiß', 'Naturell', '#F0EBDF', 'RAL 9001', 82, 'warm'],
+      ['Architects Finest Shoreditch', 'AF Shoreditch', '#C8C0B0', 'RAL 7044', 55, 'warm'],
+      ['Trendfarbe Macchiato', 'Macchiato', '#D4C3A8', 'RAL 1014', 58, 'warm'],
+      ['Trendfarbe Moon', 'Moon', '#B9BCB9', 'RAL 7038', 49, 'kuehl'],
+      ['Trendfarbe Riviera', 'Riviera', '#3E6F82', 'RAL 5009', 15, 'kuehl'],
+      ['Trendfarbe Salbei', 'Salbei', '#A9B49B', 'RAL 6021', 44, 'neutral'],
+      ['Trendfarbe Rock', 'Rock', '#5A5D5F', 'RAL 7012', 13, 'kuehl'],
+      ['Trendfarbe Blush', 'Blush', '#E3C4B8', 'RAL 3012', 58, 'warm'],
+    ]),
+  },
 ];
 
 export const ALL_MANUFACTURER_COLORS: ManufacturerColor[] = MANUFACTURER_COLLECTIONS.flatMap(
   (c) => c.colors,
 );
 
+/**
+ * Erweiterung 6 · S5 („Farb-Explosion") — kuratierte Zusatztöne.
+ * Rein additiv ANGEHÄNGT: bestehende IDs (weiss-1 … weiss-10 usw.) bleiben exakt gleich,
+ * neue Töne setzen die Nummerierung je Familie fort (weiss-11, weiss-12, …).
+ */
+for (const f of COLOR_FAMILIES) {
+  for (const r of EXTENDED_FAMILY_TONES[f.id] ?? []) {
+    f.tones.push({
+      id: `${f.id}-${f.tones.length + 1}`,
+      name: r[0],
+      nameEn: r[1],
+      hex: r[2],
+      ral: r[3],
+      ncs: r[4],
+      lrv: r[5],
+      undertone: r[6],
+      familyId: f.id,
+    });
+  }
+}
+
 export const ALL_TONES: ColorTone[] = COLOR_FAMILIES.flatMap((f) => f.tones);
+
+// ── Erweiterung 6 · S5: RAL-/NCS-/Hersteller-Töne überall zuweisbar ──
+
+/** Näherungs-LRV (Hellbezugswert) aus HEX — für Töne ohne gepflegten LRV. */
+export function hexLrv(hex: string): number {
+  const v = hex.replace('#', '');
+  const lin = (c: number) => {
+    const s = c / 255;
+    return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  const r = lin(parseInt(v.slice(0, 2), 16));
+  const g = lin(parseInt(v.slice(2, 4), 16));
+  const b = lin(parseInt(v.slice(4, 6), 16));
+  return Math.round((0.2126 * r + 0.7152 * g + 0.0722 * b) * 100);
+}
+
+/** Näherungs-Unterton aus HEX (warm/kühl/neutral) — Heuristik über Farbwinkel. */
+export function hexUndertone(hex: string): Untertone {
+  const v = hex.replace('#', '');
+  const r = parseInt(v.slice(0, 2), 16) / 255;
+  const g = parseInt(v.slice(2, 4), 16) / 255;
+  const b = parseInt(v.slice(4, 6), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (max - min < 0.03) return 'neutral';
+  let h = 0;
+  if (max === r) h = ((g - b) / (max - min)) % 6;
+  else if (max === g) h = (b - r) / (max - min) + 2;
+  else h = (r - g) / (max - min) + 4;
+  h = (h * 60 + 360) % 360;
+  return h < 100 || h >= 330 ? 'warm' : 'kuehl';
+}
+
+/** Stabile Ton-ID für einen NCS-Code, z. B. "S 1005-Y20R" → "ncs-1005-y20r". */
+export function ncsToneId(code: string): string {
+  return `ncs-${code.replace(/^S\s+/i, '').toLowerCase()}`;
+}
+
+/** Stabile Ton-ID für einen RAL-Code, z. B. "RAL 9010" → "ral-9010". */
+export function ralToneId(code: string): string {
+  return `ral-${code.replace(/^RAL\s+/i, '').toLowerCase()}`;
+}
+
+/**
+ * Löst RAL-/NCS-/Hersteller-IDs zu einem vollwertigen ColorTone auf,
+ * damit diese Töne überall (Rollen, 2D, 3D, Harmonie) verwendbar sind.
+ * Bestehende HAVEN-IDs werden hiervon NICHT berührt (rein additiv).
+ */
+export function externalTone(id: string): ColorTone | undefined {
+  if (id.startsWith('ral-')) {
+    const r = RAL_CLASSIC.find((t) => ralToneId(t.code) === id);
+    if (!r) return undefined;
+    return {
+      id,
+      name: `${r.name} (${r.code})`,
+      nameEn: r.code,
+      hex: r.hex,
+      ral: r.code,
+      ncs: '—',
+      lrv: hexLrv(r.hex),
+      undertone: hexUndertone(r.hex),
+      familyId: 'ral',
+    };
+  }
+  if (id.startsWith('ncs-')) {
+    const n = NCS_TONES.find((t) => ncsToneId(t.code) === id);
+    if (!n) return undefined;
+    return {
+      id,
+      name: n.code,
+      nameEn: n.code,
+      hex: n.hex,
+      ral: '—',
+      ncs: n.code,
+      lrv: hexLrv(n.hex),
+      undertone: hexUndertone(n.hex),
+      familyId: 'ncs',
+    };
+  }
+  const m = ALL_MANUFACTURER_COLORS.find((c) => c.id === id);
+  if (m) {
+    const coll = MANUFACTURER_COLLECTIONS.find((c) => c.colors.some((x) => x.id === id));
+    return {
+      id,
+      name: `${m.name}${coll ? ` (${coll.manufacturer})` : ''}`,
+      nameEn: m.name,
+      hex: m.hex,
+      ral: m.ral,
+      ncs: '—',
+      lrv: m.lrv,
+      undertone: m.undertone,
+      familyId: 'hersteller',
+    };
+  }
+  return undefined;
+}
 
 export function findTone(id: string | undefined): ColorTone | undefined {
   if (!id) return undefined;
-  return ALL_TONES.find((t) => t.id === id);
+  return ALL_TONES.find((t) => t.id === id) ?? externalTone(id);
 }
 
 export function findFamily(id: string): ColorFamily | undefined {

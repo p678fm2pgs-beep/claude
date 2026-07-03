@@ -3,6 +3,7 @@ import { useStore } from '../../store/useStore';
 import { useT } from '../../hooks';
 import { PageHeader, Badge } from '../../components/ui';
 import { getRoom, getActiveVariant } from '../roomHelpers';
+import { ColorBrowser } from './ColorBrowser';
 import { COLOR_FAMILIES, findTone, type ColorTone } from '../../data/colors';
 import {
   companionRecommendations,
@@ -24,6 +25,8 @@ export function ColorsModule({ roomId }: { roomId: string }) {
   const variant = getActiveVariant(room)!;
   const [familyId, setFamilyId] = useState('weiss');
   const [toneId, setToneId] = useState<string | null>(null);
+  // Erweiterung 6 · S5: zusätzliche Browser-Ansicht — Familienansicht bleibt Standard.
+  const [view, setView] = useState<'familien' | 'browser'>('familien');
 
   const family = COLOR_FAMILIES.find((f) => f.id === familyId)!;
   const tone = toneId ? findTone(toneId) : undefined;
@@ -44,8 +47,26 @@ export function ColorsModule({ roomId }: { roomId: string }) {
     <div className="p-6 lg:p-8">
       <PageHeader eyebrow={t(`roomType.${room.type}`)} title={t('colors.title')} />
 
+      {/* Ansicht: HAVEN-Familien (Standard) oder Farb-Browser (Erweiterung 6 · S5) */}
+      <div className="flex gap-2 mb-5" data-testid="color-views">
+        {(['familien', 'browser'] as const).map((v) => (
+          <button
+            key={v}
+            className={`px-3 py-1.5 text-sm border rounded ${view === v ? 'border-gold text-gold' : 'border-line text-muted hover:text-text'}`}
+            onClick={() => setView(v)}
+            data-testid={`color-view-${v}`}
+          >
+            {t(v === 'familien' ? 'colors.viewFamilies' : 'colors.viewBrowser')}
+          </button>
+        ))}
+      </div>
+
+      {view === 'browser' && (
+        <ColorBrowser roomId={roomId} onAssign={assignRole} roles={variant.colorRoles} />
+      )}
+
       {/* Familien */}
-      <div className="flex flex-wrap gap-2 mb-5" data-testid="color-families">
+      <div className={`flex flex-wrap gap-2 mb-5 ${view === 'browser' ? 'hidden' : ''}`} data-testid="color-families">
         {COLOR_FAMILIES.map((f) => (
           <button
             key={f.id}
@@ -61,7 +82,7 @@ export function ColorsModule({ roomId }: { roomId: string }) {
         ))}
       </div>
 
-      <div className="grid lg:grid-cols-[1fr_380px] gap-6">
+      <div className={`grid lg:grid-cols-[1fr_380px] gap-6 ${view === 'browser' ? 'hidden' : ''}`}>
         {/* Ton-Raster auf heller Fläche */}
         <div className="board-surface rounded p-4">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3" data-testid="tone-grid">
