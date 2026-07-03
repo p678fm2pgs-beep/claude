@@ -21,3 +21,18 @@
 | 13 | Verlegemuster prozedural aus Dielen-Albedo erzeugt (Canvas) | Offline, deterministisch, keine externen Assets, beliebig kachelbar | Fertige Muster-Fotos (Lizenz/Größe/Flakiness) |
 | 14 | `RealisticPlan` als NEUE Komponente neben `MiniPlan` | Bestehender technischer Plan bleibt 1:1 erhalten (additiv) | MiniPlan umbauen (Regressionsrisiko) |
 | 15 | Beleuchtung als eigener Katalog + `Variant.lights` | Saubere Trennung, additiv in Kalkulation | In Möbel mischen (unsauber) |
+
+## Erweiterung 7 — „Planungs-Profi-Ausbau" (W0)
+- Alle neuen Felder OPTIONAL (Opening.doorType/windowType/hinge/…, Floorplan.innerWalls/
+  wallProps/measurements/northAngleDeg) → Altdaten ohne Migration gültig, deriveAreas
+  liefert für Altpläne bitgleiche Werte (testbelegt).
+- Interaktiver Editor als NEUE Komponente PlanEditor (nur Ansicht „Technisch" im
+  Raum-Editor); MiniPlan bleibt unverändert für Karten/Boards/PDF → rein additiv.
+- Ein zentraler wallIndex-Remapper für Teilen/Löschen (Öffnungen + wallColors +
+  MaterialSelection.wallIndex gemeinsam) — verhindert stille Inkonsistenzen.
+- Raumteilung nur als bestätigter Dialog; Möbel/Gewerke bleiben beim Ursprungsraum,
+  Farben/Materialien werden in den neuen Raum kopiert (beide Teilräume sofort kalkulierbar).
+- Durchbruch = dritte Öffnungsart 'durchbruch' (reduziert Wandfläche automatisch über
+  die bestehende Öffnungsflächen-Logik; kein Sonderpfad in der Kalkulation).
+- Sandbox ohne Browser: W8-Demo/Screenshots als dokumentierte Grenze; Ersatz sind
+  Unit- + Konsistenz-Tests über die gesamte neue Geometrie-Logik.

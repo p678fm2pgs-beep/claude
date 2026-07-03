@@ -1,0 +1,311 @@
+import { useEffect, useRef, useState } from 'react';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import type { Room, Variant } from '../types';
+import { computeWallPanels } from '../lib/room3d';
+import { computeOpeningParts, type OpeningPartKind } from '../lib/openings3d';
+import { fillFloorSurface } from '../lib/texture';
+import { resolveFloorSelection, resolveMaterial, resolveWallColorHex } from '../lib/materialResolve';
+import { useT } from '../hooks';
+
+/**
+ * 3D-Raumansicht (three.js) — additiv neben Technisch & Realistisch.
+ * Extrudiert Wände aus dem Grundriss, lässt Tür-/Fenster-Öffnungen frei,
+ * legt das gewählte Bodenmaterial/Verlegemuster als Textur auf den Boden.
+ * Komplett offline (three.js lokal gebündelt). Orbit per Maus/Touch.
+ */
+export interface Room3DApi {
+  /** Rendert ein Frame und liefert ein PNG (Still-Render, S12). */
+  snapshot: () => string;
+}
+
+export function Room3D({
+  room,
+  variant,
+  width = 560,
+  height = 380,
+  showCeiling = false,
+  daylight = false,
+  apiRef,
+}: {
+  room: Room;
+  variant: Variant;
+  width?: number;
+  height?: number;
+  showCeiling?: boolean;
+  /** S12: Tageslicht-Stimmung (neutral-hell) statt warmem Abendlicht. */
+  daylight?: boolean;
+  /** S12: erhält eine Snapshot-Funktion für den Still-Render-Export. */
+  apiRef?: React.MutableRefObject<Room3DApi | null>;
+}) {
+  const t = useT();
+  const mountRef = useRef<HTMLDivElement>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    const mount = mountRef.current;
+    if (!mount) return;
+    const pts = room.floorplan.points;
+    if (pts.length < 3) return;
+
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    } catch {
+      setFailed(true);
+      return;
+    }
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // S7a: korrekter Ausgabe-Farbraum + filmisches Tone-Mapping (satte, echte Farben).
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    mount.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(daylight ? '#F3F2ED' : '#EDEAE2');
+
+    // ── Maßstab & Zentrierung (Meter) ──
+    const xs = pts.map((p) => p.x / 100);
+    const zs = pts.map((p) => p.y / 100);
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const cz = (Math.min(...zs) + Math.max(...zs)) / 2;
+    const span = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs));
+    const Hm = room.heightCm / 100;
+    // map: Grundriss (cm) → Weltkoordinaten (m), Boden auf y=0
+    const mapX = (xcm: number) => xcm / 100 - cx;
+    const mapZ = (ycm: number) => -(ycm / 100 - cz);
+
+    const disposables: { dispose: () => void }[] = [];
+
+    // ── Kamera ──
+    const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 100);
+    camera.position.set(span * 0.9, span * 1.0 + Hm, span * 1.1);
+
+    // ── Licht (S7b): weiches Grundlicht + EIN gerichtetes Licht mit weichen Schatten ──
+    // S12: optional Tageslicht (neutral-weiß, heller) statt warmem Abendlicht.
+    scene.add(new THREE.HemisphereLight(0xffffff, 0xb9b2a4, daylight ? 1.15 : 0.9));
+    const dir = new THREE.DirectionalLight(daylight ? 0xffffff : 0xfff4e0, daylight ? 1.9 : 1.6);
+    dir.position.set(span, span * 2 + 2, span * 0.6);
+    dir.castShadow = true;
+    dir.shadow.mapSize.set(2048, 2048);
+    const sr = span * 1.3 + 1;
+    dir.shadow.camera.left = -sr;
+    dir.shadow.camera.right = sr;
+    dir.shadow.camera.top = sr;
+    dir.shadow.camera.bottom = -sr;
+    dir.shadow.camera.near = 0.5;
+    dir.shadow.camera.far = span * 6 + 8;
+    dir.shadow.bias = -0.0004;
+    dir.shadow.normalBias = 0.02;
+    scene.add(dir);
+
+    // ── Boden mit Material/Verlegemuster ──
+    const shape = new THREE.Shape();
+    pts.forEach((p, i) => {
+      const X = mapX(p.x);
+      const Z = mapZ(p.y);
+      // Shape liegt in XY; nach rotateX(-90°) wird Y→Z. Damit es zu mapZ passt: Y = -Z.
+      if (i === 0) shape.moveTo(X, -Z);
+      else shape.lineTo(X, -Z);
+    });
+    const floorGeo = new THREE.ShapeGeometry(shape);
+    floorGeo.rotateX(-Math.PI / 2);
+    disposables.push(floorGeo);
+
+    const floorSel = resolveFloorSelection(variant);
+    const floorMat = resolveMaterial(floorSel);
+    let floorMaterial: THREE.Material;
+    if (floorMat) {
+      const pxPerM = 48;
+      const cw = Math.min(2048, Math.max(256, Math.round(span * pxPerM)));
+      const cnv = document.createElement('canvas');
+      cnv.width = cw;
+      cnv.height = cw;
+      const ctx = cnv.getContext('2d');
+      if (ctx) {
+        // Gemeinsame, korrekte Material-Darstellung (identisch zu 2D & Katalog-Kachel).
+        fillFloorSurface(ctx, { minX: 0, minY: 0, maxX: cw, maxY: cw }, pxPerM, {
+          texture: floorMat.texture,
+          pattern: floorSel?.pattern,
+          direction: floorSel?.layingDirection,
+          groutColor: floorSel?.groutColor,
+        });
+      }
+      const tex = new THREE.CanvasTexture(cnv);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const minXm = Math.min(...xs);
+      const minZm = Math.min(...zs);
+      const spanX = Math.max(0.01, Math.max(...xs) - minXm);
+      const spanZ = Math.max(0.01, Math.max(...zs) - minZm);
+      tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+      tex.repeat.set(1 / spanX, 1 / spanZ);
+      tex.offset.set(-(minXm - cx) / spanX, -(minZm - cz) / spanZ);
+      tex.needsUpdate = true;
+      disposables.push(tex);
+      floorMaterial = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85, metalness: 0.02 });
+    } else {
+      floorMaterial = new THREE.MeshStandardMaterial({ color: '#D9D2C4', roughness: 0.9 });
+    }
+    disposables.push(floorMaterial);
+    const floorMesh = new THREE.Mesh(floorGeo, floorMaterial);
+    floorMesh.receiveShadow = true;
+    scene.add(floorMesh);
+
+    // ── Wände (pro Wand Farbe) + gefüllte Öffnungen (S7d: keine leeren Löcher) ──
+    const wallThickness = 0.1;
+    // S7e: verdeckende Wände im Orbit ausblenden — pro Wand Materialien + Außennormale sammeln.
+    const wallFade: { center: THREE.Vector3; normal: THREE.Vector3; mats: { m: THREE.Material; base: number }[] }[] = [];
+    const partMatCache = new Map<string, THREE.Material>();
+    const partMaterial = (kind: OpeningPartKind, frameColor?: string): THREE.Material => {
+      const key = `${kind}:${frameColor ?? ''}`; // Hinweis: Fade übernimmt die Wandgruppe unten
+      const cached = partMatCache.get(key);
+      if (cached) return cached;
+      let m: THREE.Material;
+      if (kind === 'glass') {
+        m = new THREE.MeshPhysicalMaterial({
+          color: '#cfe0e6', roughness: 0.08, metalness: 0,
+          transparent: true, opacity: 0.35,
+        });
+      } else if (kind === 'leaf') {
+        m = new THREE.MeshStandardMaterial({ color: frameColor ?? '#b98c5a', roughness: 0.55 });
+      } else {
+        m = new THREE.MeshStandardMaterial({ color: frameColor ?? '#2b2b2b', roughness: 0.5, metalness: 0.3 });
+      }
+      disposables.push(m);
+      partMatCache.set(key, m);
+      return m;
+    };
+    for (let i = 0; i < pts.length; i++) {
+      const A = { x: mapX(pts[i].x), z: mapZ(pts[i].y) };
+      const B = { x: mapX(pts[(i + 1) % pts.length].x), z: mapZ(pts[(i + 1) % pts.length].y) };
+      const ex = B.x - A.x;
+      const ez = B.z - A.z;
+      const len = Math.hypot(ex, ez) || 1;
+      const ux = ex / len;
+      const uz = ez / len;
+      const angle = Math.atan2(-ez, ex);
+      const colorHex = resolveWallColorHex(variant, i);
+      const wallMaterial = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.9, transparent: true });
+      disposables.push(wallMaterial);
+      const wallCenter = new THREE.Vector3((A.x + B.x) / 2, Hm / 2, (A.z + B.z) / 2);
+      let normal = new THREE.Vector3(uz, 0, -ux);
+      if (normal.dot(new THREE.Vector3(wallCenter.x, 0, wallCenter.z)) < 0) normal = normal.multiplyScalar(-1);
+      const fadeGroup = { center: wallCenter, normal, mats: [{ m: wallMaterial as THREE.Material, base: 1 }] };
+      wallFade.push(fadeGroup);
+
+      const panels = computeWallPanels(room.floorplan, i, room.heightCm);
+      for (const p of panels) {
+        const w = (p.x1 - p.x0) / 100;
+        const h = (p.y1 - p.y0) / 100;
+        if (w <= 0 || h <= 0) continue;
+        const along = (p.x0 + p.x1) / 200; // m vom Wandanfang
+        const geo = new THREE.BoxGeometry(w, h, wallThickness);
+        disposables.push(geo);
+        const mesh = new THREE.Mesh(geo, wallMaterial);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.position.set(A.x + ux * along, (p.y0 + p.y1) / 200, A.z + uz * along);
+        mesh.rotation.y = angle;
+        scene.add(mesh);
+      }
+
+      // Öffnungen dieser Wand mit Rahmen/Glas/Türblatt füllen
+      const wallLenCm = len * 100;
+      for (const o of room.floorplan.openings.filter((op) => op.wallIndex === i)) {
+        for (const part of computeOpeningParts(o, wallLenCm, room.heightCm)) {
+          const w = (part.x1 - part.x0) / 100;
+          const h = (part.y1 - part.y0) / 100;
+          if (w <= 0 || h <= 0) continue;
+          const geo = new THREE.BoxGeometry(w, h, part.depthCm / 100);
+          disposables.push(geo);
+          const pm = partMaterial(part.kind, o.frameColor);
+          (pm as THREE.Material).transparent = true;
+          if (!fadeGroup.mats.some((x) => x.m === pm)) fadeGroup.mats.push({ m: pm, base: (pm as THREE.MeshPhysicalMaterial).opacity ?? 1 });
+          const mesh = new THREE.Mesh(geo, pm);
+          if (part.kind !== 'glass') {
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+          }
+          const along = (part.x0 + part.x1) / 200;
+          mesh.position.set(A.x + ux * along, (part.y0 + part.y1) / 200, A.z + uz * along);
+          mesh.rotation.y = angle;
+          scene.add(mesh);
+        }
+      }
+    }
+
+    // ── Decke (S7e, einblendbar) ──
+    if (showCeiling) {
+      const ceilGeo = floorGeo.clone();
+      ceilGeo.translate(0, Hm, 0);
+      disposables.push(ceilGeo);
+      const deckeSel = variant.materials.filter((m) => m.surface === 'decke').pop();
+      const deckeMat = resolveMaterial(deckeSel);
+      const ceilMaterial = new THREE.MeshStandardMaterial({
+        color: deckeMat?.texture.base ?? '#F2F0EA',
+        roughness: 0.95,
+        side: THREE.DoubleSide,
+      });
+      disposables.push(ceilMaterial);
+      scene.add(new THREE.Mesh(ceilGeo, ceilMaterial));
+    }
+
+    // ── Steuerung ──
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.target.set(0, Hm / 2, 0);
+    controls.maxPolarAngle = Math.PI / 2.05;
+    controls.minDistance = span * 0.4;
+    controls.maxDistance = span * 4 + 4;
+    controls.update();
+
+    // S12: Still-Render — ein frisches Frame rendern und als PNG liefern.
+    if (apiRef) {
+      apiRef.current = {
+        snapshot: () => {
+          renderer.render(scene, camera);
+          return renderer.domElement.toDataURL('image/png');
+        },
+      };
+    }
+
+    let raf = 0;
+    const animate = () => {
+      raf = requestAnimationFrame(animate);
+      controls.update();
+      // S7e: Wände zwischen Kamera und Raum dezent ausblenden (freie Sicht im Orbit).
+      for (const g of wallFade) {
+        const toCam = new THREE.Vector3().subVectors(camera.position, g.center);
+        const occluding = g.normal.dot(toCam) > 0 && camera.position.y < Hm * 2.2;
+        for (const e of g.mats) {
+          (e.m as THREE.MeshStandardMaterial).opacity = occluding ? Math.min(e.base, 0.14) : e.base;
+        }
+      }
+      renderer.render(scene, camera);
+    };
+    animate();
+
+    return () => {
+      cancelAnimationFrame(raf);
+      controls.dispose();
+      disposables.forEach((d) => d.dispose());
+      renderer.dispose();
+      if (renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement);
+    };
+  }, [room, variant, width, height, showCeiling, daylight, apiRef]);
+
+  if (failed) {
+    return (
+      <div className="board-surface rounded flex items-center justify-center" style={{ width, height }}>
+        <p className="text-[#6b6256] text-sm px-6 text-center">{t('plan.no3d')}</p>
+      </div>
+    );
+  }
+  return <div ref={mountRef} data-testid="room-3d" style={{ width, height }} role="img" aria-label="3D-Raumansicht" />;
+}
+
