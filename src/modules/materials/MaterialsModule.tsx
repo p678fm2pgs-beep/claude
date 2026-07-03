@@ -9,9 +9,10 @@ import { MATERIALS, MATERIAL_CATEGORIES, findMaterial, type Material } from '../
 import { findAddon } from '../../data/addons';
 import { findTone } from '../../data/colors';
 import { allWarnings } from '../../lib/suitability';
+import { buildMaterialPass, type PassSection } from '../../lib/materialPass';
 import { uid } from '../../lib/id';
 import type { PriceTier } from '../../types';
-import { X, Plus } from 'lucide-react';
+import { X, Plus, ZoomIn } from 'lucide-react';
 
 export function MaterialsModule({ roomId }: { roomId: string }) {
   const t = useT();
@@ -181,6 +182,9 @@ function MaterialDetail({
 }) {
   const t = useT();
   const lang = useStore((s) => s.lang);
+  // Erweiterung 6 · S11: Nahaufnahme (vergrößerte Struktur) + Material-Pass.
+  const [closeUp, setCloseUp] = useState(false);
+  const pass = buildMaterialPass(material);
   const warns = allWarnings(material, roomType, heightCm);
   const tech = material.tech;
   const specs: [string, string][] = [];
@@ -197,8 +201,24 @@ function MaterialDetail({
 
   return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-6" onClick={onClose}>
-      <div className="card max-w-2xl w-full overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <TextureSwatch texture={material.texture} w={680} h={260} className="w-full" />
+      <div className="card max-w-2xl w-full overflow-hidden max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="relative">
+          {closeUp ? (
+            /* Nahaufnahme: klein gezeichnet, hochskaliert → vergrößerte Struktur */
+            <div className="w-full h-[260px] overflow-hidden" data-testid="material-closeup">
+              <TextureSwatch texture={material.texture} w={227} h={87} className="w-full h-full [image-rendering:auto]" />
+            </div>
+          ) : (
+            <TextureSwatch texture={material.texture} w={680} h={260} className="w-full" />
+          )}
+          <button
+            className={`absolute bottom-3 right-3 px-2.5 py-1.5 text-xs rounded border inline-flex items-center gap-1.5 backdrop-blur bg-black/45 ${closeUp ? 'border-gold text-gold' : 'border-white/30 text-white'}`}
+            onClick={() => setCloseUp((v) => !v)}
+            data-testid="closeup-toggle"
+          >
+            <ZoomIn size={12} /> {t('materials.closeUp')}
+          </button>
+        </div>
         <div className="p-6">
           <div className="flex items-start justify-between">
             <div>
@@ -238,6 +258,36 @@ function MaterialDetail({
               ))}
             </div>
           )}
+
+          {/* Material-Pass (Erweiterung 6 · S11) */}
+          <p className="eyebrow mt-5 mb-2">{t('pass.title')}</p>
+          <div className="grid sm:grid-cols-2 gap-3" data-testid="material-pass">
+            {(
+              [
+                ['pflege', pass.pflege],
+                ['haltbarkeit', pass.haltbarkeit],
+                ['eignung', pass.eignung],
+                ['nachhaltigkeit', pass.nachhaltigkeit],
+              ] as [string, PassSection][]
+            ).map(([key, sec]) => (
+              <div key={key} className="border border-line rounded p-3" data-testid={`pass-${key}`}>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-medium">{t(`pass.${key}`)}</p>
+                  <span className="text-gold text-[10px] tracking-widest" aria-label={`${sec.score}/5`}>
+                    {'●'.repeat(sec.score)}
+                    <span className="opacity-30">{'●'.repeat(5 - sec.score)}</span>
+                  </span>
+                </div>
+                <p className="text-muted text-[11px] mb-1.5">{lang === 'de' ? sec.summary : sec.summaryEn}</p>
+                <ul className="space-y-0.5">
+                  {(lang === 'de' ? sec.lines : sec.linesEn).map((l, i) => (
+                    <li key={i} className="text-[11px] leading-snug">· {l}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+          <p className="text-muted text-[10px] mt-2">{t('pass.estimate')}</p>
 
           <button className="btn btn-primary w-full mt-6" onClick={onAdd}>
             <Plus size={15} /> {t('materials.choose')}
