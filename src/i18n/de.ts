@@ -153,6 +153,14 @@ export const de: Record<string, string> = {
   'style.apply': 'Preset übernehmen',
   'style.applied': 'Preset übernommen',
   'style.none': 'Ohne Preset fortfahren',
+  'style.signature': 'HAVEN Signature Looks',
+  'style.signatureIntro':
+    'Acht redaktionell kuratierte Raum-Looks — Farbklang, Boden, Wand, Metall und Textil in einem Schritt.',
+  'style.lookApply': 'Look anwenden',
+  'style.lookApplied': 'Look übernommen',
+  'style.lookConfirmTitle': 'Look übernehmen?',
+  'style.lookConfirmBody':
+    'Der Look setzt Farbrollen sowie Boden- und Wand-Auswahl der aktiven Variante neu. Decke, Möbel, Gewerke und Notizen bleiben unverändert.',
 
   // Colors
   'colors.title': 'Farben & Harmonie',

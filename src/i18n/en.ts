@@ -144,6 +144,14 @@ export const en: Record<string, string> = {
   'style.apply': 'Apply preset',
   'style.applied': 'Preset applied',
   'style.none': 'Continue without preset',
+  'style.signature': 'HAVEN Signature Looks',
+  'style.signatureIntro':
+    'Eight editorially curated room looks — colour chord, floor, wall, metal and textile in one step.',
+  'style.lookApply': 'Apply look',
+  'style.lookApplied': 'Look applied',
+  'style.lookConfirmTitle': 'Apply this look?',
+  'style.lookConfirmBody':
+    'The look resets colour roles plus floor and wall selections of the active variant. Ceiling, furniture, trades and notes remain unchanged.',
 
   'colors.title': 'Colors & harmony',
   'colors.families': 'Color families',
