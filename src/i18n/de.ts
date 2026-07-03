@@ -327,6 +327,8 @@ export const de: Record<string, string> = {
   'board.furniture': 'Möbel',
   'board.plan': 'Grundriss',
   'board.notes': 'Notizen',
+  'board.musterbrett': 'Digitales Musterbrett',
+  'board.musterbrettPng': 'Als PNG exportieren',
   'board.costs': 'Kosten',
   'board.exportPdf': 'PDF exportieren',
   'board.exportInternalPdf': 'Kalkulations-PDF (intern)',

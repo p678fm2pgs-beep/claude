@@ -3,6 +3,7 @@ import { useStore } from '../../store/useStore';
 import { useT } from '../../hooks';
 import { PageHeader, EmptyState } from '../../components/ui';
 import { BoardView } from './BoardView';
+import { Musterbrett } from './Musterbrett';
 import { getRoom, getActiveVariant } from '../roomHelpers';
 import { exportProjectPdf } from '../pdf/exportPdf';
 import { computeRoomCost } from '../../lib/projectCost';
@@ -117,6 +118,7 @@ export function BoardModule({ roomId }: { roomId: string }) {
       ) : (
         <>
           <BoardView room={room} variant={variant} coverage={project.settings.paintCoverage} />
+          <Musterbrett room={room} variant={variant} />
           <div className="card p-4 mt-4">
             <label className="field-label">{t('board.notes')}</label>
             <textarea className="field-input min-h-[80px]" value={variant.notes} onChange={(e) => setNotes(e.target.value)} data-testid="board-notes" />

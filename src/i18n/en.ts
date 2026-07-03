@@ -310,6 +310,8 @@ export const en: Record<string, string> = {
   'board.furniture': 'Furniture',
   'board.plan': 'Floor plan',
   'board.notes': 'Notes',
+  'board.musterbrett': 'Digital sample board',
+  'board.musterbrettPng': 'Export as PNG',
   'board.costs': 'Costs',
   'board.exportPdf': 'Export PDF',
   'board.exportInternalPdf': 'Calculation PDF (internal)',
