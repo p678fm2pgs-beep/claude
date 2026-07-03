@@ -6,11 +6,13 @@ import { BoardView } from './BoardView';
 import { Musterbrett } from './Musterbrett';
 import { getRoom, getActiveVariant } from '../roomHelpers';
 import { exportProjectPdf } from '../pdf/exportPdf';
+import { exportLookbookPdf } from '../pdf/exportLookbook';
+import { downloadSampleCsv } from '../../lib/sampleList';
 import { computeRoomCost } from '../../lib/projectCost';
 import { uid } from '../../lib/id';
 import { formatEUR } from '../../lib/format';
 import type { Room } from '../../types';
-import { FileText, FileDown, Mail, Plus, Maximize2, GitCompare } from 'lucide-react';
+import { FileText, FileDown, Mail, Plus, Maximize2, GitCompare, BookOpen, ListChecks } from 'lucide-react';
 
 export function BoardModule({ roomId }: { roomId: string }) {
   const t = useT();
@@ -76,6 +78,13 @@ export function BoardModule({ roomId }: { roomId: string }) {
                 <FileDown size={15} /> {t('board.exportInternalPdf')}
               </button>
             )}
+            {/* Erweiterung 6 · S12: Lookbook + Musterbestell-Liste */}
+            <button className="btn btn-ghost" onClick={() => exportLookbookPdf(project, lang)} data-testid="export-lookbook">
+              <BookOpen size={15} /> {t('board.lookbook')}
+            </button>
+            <button className="btn btn-ghost" onClick={() => downloadSampleCsv(project)} data-testid="export-samples">
+              <ListChecks size={15} /> {t('board.sampleList')}
+            </button>
             <button className="btn btn-ghost" onClick={email} data-testid="email-btn">
               <Mail size={15} /> {t('board.email')}
             </button>

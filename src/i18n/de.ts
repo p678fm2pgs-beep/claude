@@ -119,6 +119,8 @@ export const de: Record<string, string> = {
   'plan.realistic': 'Realistische Ansicht',
   'plan.threeD': '3D',
   'plan.orbitHint': 'Mit der Maus drehen · scrollen zum Zoomen',
+  'plan.daylight': 'Tageslicht',
+  'plan.still': 'Still-Render (PNG)',
   'plan.ceiling': 'Decke',
   'plan.no3d': '3D-Ansicht in diesem Browser nicht verfügbar (WebGL fehlt).',
 
@@ -341,6 +343,8 @@ export const de: Record<string, string> = {
   'board.plan': 'Grundriss',
   'board.notes': 'Notizen',
   'board.musterbrett': 'Digitales Musterbrett',
+  'board.lookbook': 'Lookbook (PDF)',
+  'board.sampleList': 'Musterliste (CSV)',
   'board.musterbrettPng': 'Als PNG exportieren',
   'board.costs': 'Kosten',
   'board.exportPdf': 'PDF exportieren',

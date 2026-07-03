@@ -221,6 +221,9 @@ function RoomEditor({
   const [heightErr, setHeightErr] = useState<string | undefined>();
   const [planView, setPlanView] = useState<'technisch' | 'realistisch' | 'dreidimensional'>('technisch');
   const [showCeiling, setShowCeiling] = useState(false);
+  // Erweiterung 6 · S12: Tageslicht-Stimmung + Still-Render-Zugriff.
+  const [daylight, setDaylight] = useState(false);
+  const room3dApi = useRef<import('../../components/Room3D').Room3DApi | null>(null);
 
   const applyRectangle = () => {
     const w = parseLocaleNumber(widthStr);
@@ -302,13 +305,37 @@ function RoomEditor({
               {t('plan.threeD')}
             </button>
             {planView === 'dreidimensional' && (
-              <button
-                className={`px-2.5 py-1 text-xs border rounded ${showCeiling ? 'border-gold text-gold' : 'border-line text-muted'}`}
-                onClick={() => setShowCeiling((v) => !v)}
-                data-testid="plan-ceiling"
-              >
-                {t('plan.ceiling')}
-              </button>
+              <>
+                <button
+                  className={`px-2.5 py-1 text-xs border rounded ${showCeiling ? 'border-gold text-gold' : 'border-line text-muted'}`}
+                  onClick={() => setShowCeiling((v) => !v)}
+                  data-testid="plan-ceiling"
+                >
+                  {t('plan.ceiling')}
+                </button>
+                {/* Erweiterung 6 · S12: Tageslicht + Still-Render */}
+                <button
+                  className={`px-2.5 py-1 text-xs border rounded ${daylight ? 'border-gold text-gold' : 'border-line text-muted'}`}
+                  onClick={() => setDaylight((v) => !v)}
+                  data-testid="plan-daylight"
+                >
+                  {t('plan.daylight')}
+                </button>
+                <button
+                  className="px-2.5 py-1 text-xs border rounded border-line text-muted hover:text-text"
+                  onClick={() => {
+                    const url = room3dApi.current?.snapshot();
+                    if (!url) return;
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `haven-still-${room.name.replace(/\s+/g, '_')}.png`;
+                    a.click();
+                  }}
+                  data-testid="plan-still"
+                >
+                  {t('plan.still')}
+                </button>
+              </>
             )}
           </div>
           <span className="eyebrow">{t('rooms.title')}</span>
@@ -324,7 +351,7 @@ function RoomEditor({
         <div className="board-surface rounded p-3">
           {planView === 'dreidimensional' && variant ? (
             <Suspense fallback={<div style={{ width: 560, height: 360 }} className="flex items-center justify-center text-[#6b6256] text-sm">3D…</div>}>
-              <Room3D room={room} variant={variant} width={560} height={360} showCeiling={showCeiling} />
+              <Room3D room={room} variant={variant} width={560} height={360} showCeiling={showCeiling} daylight={daylight} apiRef={room3dApi} />
             </Suspense>
           ) : planView === 'realistisch' && variant ? (
             <RealisticPlan room={room} variant={variant} width={560} height={360} showDimensions />

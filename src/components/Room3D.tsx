@@ -14,18 +14,29 @@ import { useT } from '../hooks';
  * legt das gewählte Bodenmaterial/Verlegemuster als Textur auf den Boden.
  * Komplett offline (three.js lokal gebündelt). Orbit per Maus/Touch.
  */
+export interface Room3DApi {
+  /** Rendert ein Frame und liefert ein PNG (Still-Render, S12). */
+  snapshot: () => string;
+}
+
 export function Room3D({
   room,
   variant,
   width = 560,
   height = 380,
   showCeiling = false,
+  daylight = false,
+  apiRef,
 }: {
   room: Room;
   variant: Variant;
   width?: number;
   height?: number;
   showCeiling?: boolean;
+  /** S12: Tageslicht-Stimmung (neutral-hell) statt warmem Abendlicht. */
+  daylight?: boolean;
+  /** S12: erhält eine Snapshot-Funktion für den Still-Render-Export. */
+  apiRef?: React.MutableRefObject<Room3DApi | null>;
 }) {
   const t = useT();
   const mountRef = useRef<HTMLDivElement>(null);
@@ -55,7 +66,7 @@ export function Room3D({
     mount.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color('#EDEAE2');
+    scene.background = new THREE.Color(daylight ? '#F3F2ED' : '#EDEAE2');
 
     // ── Maßstab & Zentrierung (Meter) ──
     const xs = pts.map((p) => p.x / 100);
@@ -75,8 +86,9 @@ export function Room3D({
     camera.position.set(span * 0.9, span * 1.0 + Hm, span * 1.1);
 
     // ── Licht (S7b): weiches Grundlicht + EIN gerichtetes Licht mit weichen Schatten ──
-    scene.add(new THREE.HemisphereLight(0xffffff, 0xb9b2a4, 0.9));
-    const dir = new THREE.DirectionalLight(0xfff4e0, 1.6);
+    // S12: optional Tageslicht (neutral-weiß, heller) statt warmem Abendlicht.
+    scene.add(new THREE.HemisphereLight(0xffffff, 0xb9b2a4, daylight ? 1.15 : 0.9));
+    const dir = new THREE.DirectionalLight(daylight ? 0xffffff : 0xfff4e0, daylight ? 1.9 : 1.6);
     dir.position.set(span, span * 2 + 2, span * 0.6);
     dir.castShadow = true;
     dir.shadow.mapSize.set(2048, 2048);
@@ -252,6 +264,16 @@ export function Room3D({
     controls.maxDistance = span * 4 + 4;
     controls.update();
 
+    // S12: Still-Render — ein frisches Frame rendern und als PNG liefern.
+    if (apiRef) {
+      apiRef.current = {
+        snapshot: () => {
+          renderer.render(scene, camera);
+          return renderer.domElement.toDataURL('image/png');
+        },
+      };
+    }
+
     let raf = 0;
     const animate = () => {
       raf = requestAnimationFrame(animate);
@@ -275,7 +297,7 @@ export function Room3D({
       renderer.dispose();
       if (renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement);
     };
-  }, [room, variant, width, height, showCeiling]);
+  }, [room, variant, width, height, showCeiling, daylight, apiRef]);
 
   if (failed) {
     return (
