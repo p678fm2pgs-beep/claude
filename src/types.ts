@@ -34,7 +34,14 @@ export interface Point {
   y: number;
 }
 
-export type OpeningKind = 'fenster' | 'tuer';
+/** 'durchbruch' (Erweiterung 7): offene Wandöffnung ohne Tür. */
+export type OpeningKind = 'fenster' | 'tuer' | 'durchbruch';
+
+// ── Erweiterung 7: Tür-/Fenster-Typen (alle Felder optional → Altdaten gültig) ──
+
+export type DoorType = 'dreh' | 'schiebe' | 'doppel' | 'durchgang' | 'pocket' | 'falt';
+export type WindowType = 'dreh-kipp' | 'fest' | 'schiebe' | 'bodentief';
+export type Hinge = 'links' | 'rechts';
 
 /** Öffnung auf einer Wand (Wand = Kante zwischen Polygonpunkt i und i+1). */
 export interface Opening {
@@ -49,6 +56,48 @@ export interface Opening {
   sillCm: number;
   /** (Erweiterung 4, optional) Rahmenfarbe als HEX, z. B. schwarze Fensterrahmen. */
   frameColor?: string;
+  /** (Erweiterung 7, optional) Türtyp — default 'dreh'. */
+  doorType?: DoorType;
+  /** (Erweiterung 7, optional) Fenstertyp — default 'dreh-kipp'. */
+  windowType?: WindowType;
+  /** (Erweiterung 7, optional) DIN-Anschlag — default 'links'. */
+  hinge?: Hinge;
+  /** (Erweiterung 7, optional) öffnet nach innen — default true. */
+  opensInward?: boolean;
+  /** (Erweiterung 7, optional) Fensterflügel 1–3 — default 1. */
+  wings?: 1 | 2 | 3;
+  /** (Erweiterung 7, optional) Sprossen — default false. */
+  muntins?: boolean;
+}
+
+// ── Erweiterung 7: Innenwände, Messungen, Nordpfeil (alle optional) ──
+
+export type WallType = 'massiv' | 'trockenbau' | 'halbhoch';
+
+/** Frei gezeichnete Innenwand/Raumteiler (unabhängig vom Umriss-Polygon). */
+export interface InnerWall {
+  id: string;
+  a: Point;
+  b: Point;
+  thicknessCm: number;
+  wallType: WallType;
+  /** Eigene Höhe (nur 'halbhoch'), sonst Raumhöhe. */
+  heightCm?: number;
+  loadbearing?: boolean;
+}
+
+/** Eigenschaften einer Umfassungswand (Kante i). */
+export interface WallProps {
+  thicknessCm?: number;
+  wallType?: WallType;
+  loadbearing?: boolean;
+}
+
+/** Behaltene Messung (digitaler Zollstock). */
+export interface Measurement {
+  id: string;
+  a: Point;
+  b: Point;
 }
 
 // ── Erweiterung 4: Zwei-Ebenen-Logik (alle Felder optional → Altdaten bleiben gültig) ──
@@ -87,6 +136,14 @@ export interface Floorplan {
   /** Polygon-Eckpunkte in cm, im Uhrzeigersinn oder gegen. */
   points: Point[];
   openings: Opening[];
+  /** (Erweiterung 7, optional) freie Innenwände/Raumteiler. */
+  innerWalls?: InnerWall[];
+  /** (Erweiterung 7, optional) Eigenschaften je Umfassungswand (Index). */
+  wallProps?: Record<number, WallProps>;
+  /** (Erweiterung 7, optional) behaltene Messungen. */
+  measurements?: Measurement[];
+  /** (Erweiterung 7, optional) Nordrichtung in Grad (0 = oben). */
+  northAngleDeg?: number;
 }
 
 export interface Light {

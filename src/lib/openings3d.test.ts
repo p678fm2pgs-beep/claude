@@ -48,3 +48,68 @@ describe('Erweiterung 5 — Öffnungs-Bauteile (3D)', () => {
     expect(computeOpeningParts({ ...win, widthCm: 0 }, 500, 270)).toEqual([]);
   });
 });
+
+// ── Erweiterung 7 · W1/W3: Türtypen, Anschlag, Flügel, Sprossen, Durchbruch ──
+describe('Erweiterung 7 — parametrisierte Öffnungen', () => {
+  const baseDoor: Opening = {
+    id: 'd', kind: 'tuer', wallIndex: 0, offsetCm: 100, widthCm: 90,
+    heightCm: 200, sillCm: 0,
+  };
+  const baseWin: Opening = {
+    id: 'w', kind: 'fenster', wallIndex: 0, offsetCm: 100, widthCm: 180,
+    heightCm: 140, sillCm: 90,
+  };
+
+  it('Durchgang: KEIN Türblatt', () => {
+    const parts = computeOpeningParts({ ...baseDoor, doorType: 'durchgang' }, 500, 270);
+    expect(parts.some((p) => p.kind === 'leaf')).toBe(false);
+    expect(parts.some((p) => p.kind === 'frame')).toBe(true);
+  });
+
+  it('Doppelflügel: genau zwei Blätter', () => {
+    const parts = computeOpeningParts({ ...baseDoor, doorType: 'doppel', widthCm: 160 }, 500, 270);
+    expect(parts.filter((p) => p.kind === 'leaf').length).toBe(2);
+  });
+
+  it('Schiebetür: Blatt läuft VOR der Wand (depthOffset ≠ 0)', () => {
+    const parts = computeOpeningParts({ ...baseDoor, doorType: 'schiebe' }, 500, 270);
+    const leaf = parts.find((p) => p.kind === 'leaf')!;
+    expect(Math.abs(leaf.depthOffsetCm ?? 0)).toBeGreaterThan(5);
+  });
+
+  it('Drehtür: Anschlag rechts → Spalt an der linken Griffseite', () => {
+    const links = computeOpeningParts({ ...baseDoor, hinge: 'links' }, 500, 270).find((p) => p.kind === 'leaf')!;
+    const rechts = computeOpeningParts({ ...baseDoor, hinge: 'rechts' }, 500, 270).find((p) => p.kind === 'leaf')!;
+    expect(links.x0).toBeLessThan(rechts.x0);
+  });
+
+  it('Fenster: 3 Flügel → 2 Pfosten; Sprossen → zusätzliche Querstäbe', () => {
+    const plain = computeOpeningParts({ ...baseWin, wings: 1 }, 500, 270);
+    const three = computeOpeningParts({ ...baseWin, wings: 3 }, 500, 270);
+    const sprossen = computeOpeningParts({ ...baseWin, wings: 1, muntins: true }, 500, 270);
+    expect(three.filter((p) => p.kind === 'mullion').length).toBe(2);
+    expect(plain.filter((p) => p.kind === 'mullion').length).toBe(0);
+    expect(sprossen.filter((p) => p.kind === 'mullion').length).toBe(2);
+  });
+
+  it('Brüstung 0 (bodentief): Glas beginnt am Boden(-Rahmen)', () => {
+    const parts = computeOpeningParts({ ...baseWin, sillCm: 0, windowType: 'bodentief', heightCm: 230 }, 500, 270);
+    const glass = parts.find((p) => p.kind === 'glass')!;
+    expect(glass.y0).toBeLessThanOrEqual(6.5);
+  });
+
+  it('Durchbruch: keine Blätter, kein Glas, Wandfläche über Öffnungsmaß reduzierbar', () => {
+    const parts = computeOpeningParts(
+      { id: 'p', kind: 'durchbruch', wallIndex: 0, offsetCm: 50, widthCm: 150, heightCm: 220, sillCm: 0 },
+      500, 270,
+    );
+    expect(parts.some((p) => p.kind === 'leaf' || p.kind === 'glass')).toBe(false);
+    expect(parts.length).toBeGreaterThan(0);
+  });
+
+  it('Altdaten ohne neue Felder: identisches Verhalten wie vor Erweiterung 7', () => {
+    const before = computeOpeningParts(baseDoor, 500, 270);
+    const explicit = computeOpeningParts({ ...baseDoor, doorType: 'dreh', hinge: 'links', opensInward: true }, 500, 270);
+    expect(before).toEqual(explicit);
+  });
+});

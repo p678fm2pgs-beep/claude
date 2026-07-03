@@ -16,8 +16,8 @@ import {
   validateOpening,
   LIMITS,
 } from '../../lib/validation';
-import type { RoomType, Opening, Floorplan } from '../../types';
-import { Plus, Copy, Trash2, Undo2, Redo2, X } from 'lucide-react';
+import type { RoomType, Opening, Floorplan, DoorType, WindowType } from '../../types';
+import { Plus, Copy, Trash2, Undo2, Redo2, X, FlipHorizontal2, ArrowLeftRight } from 'lucide-react';
 
 const ROOM_TYPES: RoomType[] = [
   'wohnzimmer', 'esszimmer', 'schlafzimmer', 'kueche', 'bad',
@@ -258,7 +258,7 @@ function RoomEditor({
     commit((_fp, setHeight) => setHeight(Math.round(h * CM_PER_M)));
   };
 
-  const addOpening = (kind: 'fenster' | 'tuer') => {
+  const addOpening = (kind: 'fenster' | 'tuer' | 'durchbruch') => {
     commit((fp) => {
       const wall = 0;
       const op: Opening = {
@@ -266,9 +266,9 @@ function RoomEditor({
         kind,
         wallIndex: wall,
         offsetCm: 30,
-        widthCm: kind === 'tuer' ? 90 : 120,
-        heightCm: kind === 'tuer' ? 200 : 140,
-        sillCm: kind === 'tuer' ? 0 : 90,
+        widthCm: kind === 'tuer' ? 88.5 : kind === 'durchbruch' ? 150 : 120,
+        heightCm: kind === 'fenster' ? 140 : kind === 'durchbruch' ? 220 : 200,
+        sillCm: kind === 'fenster' ? 90 : 0,
       };
       fp.openings.push(op);
     });
@@ -427,6 +427,9 @@ function RoomEditor({
               <button className="btn btn-ghost px-3 py-1.5 text-xs" onClick={() => addOpening('tuer')} data-testid="add-door">
                 <Plus size={13} /> {t('rooms.addDoor')}
               </button>
+              <button className="btn btn-ghost px-3 py-1.5 text-xs" onClick={() => addOpening('durchbruch')} data-testid="add-passage">
+                <Plus size={13} /> {t('rooms.addPassage')}
+              </button>
             </div>
           </div>
           <div className="space-y-3" data-testid="openings-list">
@@ -485,16 +488,143 @@ function OpeningRow({
       fp.openings = fp.openings.filter((x) => x.id !== openingId);
     });
 
+  // Erweiterung 7 · W1/W3: Typ, Anschlag, Öffnungsrichtung, Flügel, Sprossen, Schnellmaße.
+  const setOpening = (fn: (op: Opening) => void) =>
+    commit((fp) => {
+      const op = fp.openings.find((x) => x.id === openingId);
+      if (op) fn(op);
+    });
+  const DOOR_TYPES: DoorType[] = ['dreh', 'schiebe', 'doppel', 'durchgang', 'pocket', 'falt'];
+  const WINDOW_TYPES: WindowType[] = ['dreh-kipp', 'fest', 'schiebe', 'bodentief'];
+  const doorWidths = [76, 88.5, 101];
+  const windowWidths = [60, 100, 120, 180];
+  const sillQuick = [0, 60, 85, 90, 110];
+  const swings = (o.kind === 'tuer' && (o.doorType ?? 'dreh') === 'dreh') || (o.doorType ?? 'dreh') === 'doppel';
+
   return (
     <div className={`border rounded p-3 ${err ? 'border-danger/50' : 'border-line'}`} data-testid="opening-row">
       <div className="flex items-center justify-between mb-2">
         <Badge tone={o.kind === 'fenster' ? 'gold' : 'muted'}>
-          {o.kind === 'fenster' ? t('rooms.addWindow') : t('rooms.addDoor')}
+          {o.kind === 'fenster' ? t('rooms.addWindow') : o.kind === 'durchbruch' ? t('rooms.addPassage') : t('rooms.addDoor')}
         </Badge>
         <button className="text-muted hover:text-danger" onClick={remove} aria-label={t('common.delete')}>
           <X size={15} />
         </button>
       </div>
+
+      {o.kind === 'tuer' && (
+        <div className="mb-2 space-y-2">
+          <select
+            className="field-input text-xs"
+            value={o.doorType ?? 'dreh'}
+            onChange={(e) => setOpening((op) => { op.doorType = e.target.value as DoorType; })}
+            data-testid="door-type"
+          >
+            {DOOR_TYPES.map((dt) => (
+              <option key={dt} value={dt}>{t(`doorType.${dt}`)}</option>
+            ))}
+          </select>
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              className="px-2 py-1 text-[11px] border border-line rounded text-muted hover:text-text inline-flex items-center gap-1"
+              onClick={() => setOpening((op) => { op.hinge = (op.hinge ?? 'links') === 'links' ? 'rechts' : 'links'; })}
+              data-testid="opening-mirror"
+            >
+              <FlipHorizontal2 size={11} /> {t('opening.mirror')} ({t(`opening.hinge.${o.hinge ?? 'links'}`)})
+            </button>
+            {swings && (
+              <button
+                className="px-2 py-1 text-[11px] border border-line rounded text-muted hover:text-text inline-flex items-center gap-1"
+                onClick={() => setOpening((op) => { op.opensInward = !(op.opensInward ?? true); })}
+                data-testid="opening-inout"
+              >
+                <ArrowLeftRight size={11} /> {(o.opensInward ?? true) ? t('opening.opensInward') : t('opening.opensOutward')}
+              </button>
+            )}
+            {doorWidths.map((wcm) => (
+              <button
+                key={wcm}
+                className={`px-2 py-1 text-[11px] border rounded ${Math.abs(o.widthCm - wcm) < 0.5 ? 'border-gold text-gold' : 'border-line text-muted hover:text-text'}`}
+                onClick={() => setOpening((op) => { op.widthCm = wcm; })}
+                data-testid={`door-width-${wcm}`}
+              >
+                {(wcm / CM_PER_M).toLocaleString('de-DE', { minimumFractionDigits: 2 })} m
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {o.kind === 'fenster' && (
+        <div className="mb-2 space-y-2">
+          <select
+            className="field-input text-xs"
+            value={o.windowType ?? 'dreh-kipp'}
+            onChange={(e) => setOpening((op) => {
+              op.windowType = e.target.value as WindowType;
+              if (e.target.value === 'bodentief') op.sillCm = 0;
+            })}
+            data-testid="window-type"
+          >
+            {WINDOW_TYPES.map((wt) => (
+              <option key={wt} value={wt}>{t(`windowType.${wt}`)}</option>
+            ))}
+          </select>
+          <div className="flex flex-wrap gap-1.5 items-center">
+            <button
+              className="px-2 py-1 text-[11px] border border-line rounded text-muted hover:text-text inline-flex items-center gap-1"
+              onClick={() => setOpening((op) => { op.hinge = (op.hinge ?? 'links') === 'links' ? 'rechts' : 'links'; })}
+              data-testid="window-mirror"
+            >
+              <FlipHorizontal2 size={11} /> {t('opening.mirror')} ({t(`opening.hinge.${o.hinge ?? 'links'}`)})
+            </button>
+            <span className="text-muted text-[10px]">{t('opening.wings')}:</span>
+            {([1, 2, 3] as const).map((n) => (
+              <button
+                key={n}
+                className={`px-2 py-1 text-[11px] border rounded ${(o.wings ?? 1) === n ? 'border-gold text-gold' : 'border-line text-muted hover:text-text'}`}
+                onClick={() => setOpening((op) => { op.wings = n; })}
+                data-testid={`window-wings-${n}`}
+              >
+                {n}
+              </button>
+            ))}
+            <button
+              className={`px-2 py-1 text-[11px] border rounded ${o.muntins ? 'border-gold text-gold' : 'border-line text-muted hover:text-text'}`}
+              onClick={() => setOpening((op) => { op.muntins = !op.muntins; })}
+              data-testid="window-muntins"
+            >
+              {t('opening.muntins')}
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5 items-center">
+            <span className="text-muted text-[10px]">{t('opening.sill')}:</span>
+            {sillQuick.map((s) => (
+              <button
+                key={s}
+                className={`px-2 py-1 text-[11px] border rounded ${o.sillCm === s ? 'border-gold text-gold' : 'border-line text-muted hover:text-text'}`}
+                onClick={() => setOpening((op) => {
+                  op.sillCm = s;
+                  if (s === 0) op.windowType = 'bodentief';
+                })}
+                data-testid={`window-sill-${s}`}
+              >
+                {s} cm
+              </button>
+            ))}
+            {windowWidths.map((wcm) => (
+              <button
+                key={wcm}
+                className={`px-2 py-1 text-[11px] border rounded ${Math.abs(o.widthCm - wcm) < 0.5 ? 'border-gold text-gold' : 'border-line text-muted hover:text-text'}`}
+                onClick={() => setOpening((op) => { op.widthCm = wcm; })}
+                data-testid={`window-width-${wcm}`}
+              >
+                B {(wcm / CM_PER_M).toLocaleString('de-DE', { minimumFractionDigits: 2 })} m
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-2 text-xs">
         <label>
           <span className="text-muted">{t('rooms.wall')} (0–{wallCount - 1}, {wallLenM} m)</span>

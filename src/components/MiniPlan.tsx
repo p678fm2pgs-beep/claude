@@ -1,5 +1,6 @@
 import type { Floorplan } from '../types';
 import { CM_PER_M, wallLengthCm } from '../lib/geometry';
+import { openingSymbol, inwardNormal } from '../lib/planSymbols';
 
 interface Props {
   plan: Floorplan;
@@ -49,17 +50,34 @@ export function MiniPlan({ plan, width = 320, height = 240, showDimensions = fal
         const y0 = a.y + (b.y - a.y) * t0;
         const x1 = a.x + (b.x - a.x) * t1;
         const y1 = a.y + (b.y - a.y) * t1;
+        // Erweiterung 7: korrektes Architektursymbol zusätzlich zur Öffnungsmarkierung.
+        const inward = inwardNormal(pts, o.wallIndex);
+        const symbol = openingSymbol(o, a, b, inward);
+        const color = o.kind === 'fenster' ? '#5A7488' : o.kind === 'durchbruch' ? '#8C9C8A' : '#B0855B';
         return (
-          <line
-            key={o.id}
-            x1={tx(x0)}
-            y1={ty(y0)}
-            x2={tx(x1)}
-            y2={ty(y1)}
-            stroke={o.kind === 'fenster' ? '#5A7488' : '#B0855B'}
-            strokeWidth={4}
-            strokeLinecap="round"
-          />
+          <g key={o.id}>
+            <line
+              x1={tx(x0)}
+              y1={ty(y0)}
+              x2={tx(x1)}
+              y2={ty(y1)}
+              stroke={color}
+              strokeWidth={4}
+              strokeLinecap="round"
+              opacity={o.kind === 'durchbruch' ? 0.4 : 1}
+            />
+            {symbol.map((s, i) => (
+              <polyline
+                key={i}
+                points={s.pts.map((p) => `${tx(p.x)},${ty(p.y)}`).join(' ')}
+                fill="none"
+                stroke={color}
+                strokeWidth={s.style === 'solid' ? 1.6 : 1}
+                strokeDasharray={s.style === 'dashed' ? '4 3' : undefined}
+                opacity={s.style === 'thin' ? 0.75 : 1}
+              />
+            ))}
+          </g>
         );
       })}
       {/* Maße je Wand */}

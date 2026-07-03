@@ -231,7 +231,9 @@ export function Room3D({
             mesh.receiveShadow = true;
           }
           const along = (part.x0 + part.x1) / 200;
-          mesh.position.set(A.x + ux * along, (part.y0 + part.y1) / 200, A.z + uz * along);
+          // Erweiterung 7: senkrechter Versatz (z. B. Schiebetür-Ebene VOR der Wand).
+          const off = (part.depthOffsetCm ?? 0) / 100;
+          mesh.position.set(A.x + ux * along - uz * off, (part.y0 + part.y1) / 200, A.z + uz * along + ux * off);
           mesh.rotation.y = angle;
           scene.add(mesh);
         }
