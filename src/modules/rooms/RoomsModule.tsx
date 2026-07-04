@@ -419,7 +419,15 @@ function RoomEditor({
             <RealisticPlan room={room} variant={variant} width={560} height={360} showDimensions />
           ) : (
             /* Erweiterung 7 · W2/W4: interaktiver Editor (Ziehen, Wand-Werkzeug, Live-Maße) */
-            <PlanEditor room={room} commit={commit} width={560} height={360} onSplitRoom={splitRoom} />
+            <PlanEditor
+              room={room}
+              commit={commit}
+              width={560}
+              height={360}
+              onSplitRoom={splitRoom}
+              projectDismissed={project.dismissedHints ?? []}
+              onDismissHint={(key) => updateProject((p) => { p.dismissedHints = [...(p.dismissedHints ?? []), key]; })}
+            />
           )}
           <div className="flex items-center gap-2 mt-2 text-[#6b6256] text-xs">
             {planView === 'dreidimensional' ? (

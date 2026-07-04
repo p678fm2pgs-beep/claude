@@ -40,6 +40,7 @@ import { FURNITURE_TYPES, findFurnitureType } from '../data/furniture';
 import { electroSymbol } from '../lib/electroSymbols';
 import { footprintAreaM2 } from '../lib/objects';
 import { compressImage } from '../lib/image';
+import { checkWayfinding } from '../lib/wayfinding';
 import { ELECTRO_LABELS } from '../lib/projectCost';
 import type { PlacedObject, ElectroItem, ElectroKind, PlanPin, PinCategory } from '../types';
 
@@ -72,6 +73,8 @@ export function PlanEditor({
   width = 560,
   height = 360,
   onSplitRoom,
+  projectDismissed = [],
+  onDismissHint,
 }: {
   room: Room;
   commit: (fn: (fp: Floorplan, setHeight: (h: number) => void, room: Room) => void) => void;
@@ -79,6 +82,10 @@ export function PlanEditor({
   height?: number;
   /** W4: Raum durch die neue Wand in zwei Räume teilen (Projekt-Ebene). */
   onSplitRoom?: (polyA: Point[], polyB: Point[], wall: InnerWall) => void;
+  /** T5: projektweit ignorierte Hinweis-Schlüssel. */
+  projectDismissed?: string[];
+  /** T5: Hinweis ignorieren (auf Projekt-Ebene merken). */
+  onDismissHint?: (key: string) => void;
 }) {
   const t = useT();
   // Interne Ebenen (Pins) nur im Expertenmodus — Kunden-/Präsentationsmodus NIE.
@@ -131,7 +138,8 @@ export function PlanEditor({
   const [heatDraw, setHeatDraw] = useState<Point[] | null>(null);
   const [pinCat, setPinCat] = useState<PinCategory>('hinweis');
   const [pinEdit, setPinEdit] = useState<string | null>(null);
-  const [layers, setLayers] = useState({ electro: true, heat: true, pins: true });
+  // Hinweise: im Beratungsmodus standardmäßig AUS; Präsentationsmodus zeigt sie NIE.
+  const [layers, setLayers] = useState({ electro: true, heat: true, pins: true, hints: mode === 'experte' });
   // ── W8: Onboarding + Kürzel-Übersicht (einmalig, überspringbar) ──
   const [showHelp, setShowHelp] = useState<boolean>(() => {
     try {
@@ -994,6 +1002,32 @@ export function PlanEditor({
           </g>
         ))}
 
+        {/* Erweiterung 8 · T5: Laufwege-Hinweise (dezent, ignorierbar; Präsentation NIE) */}
+        {layers.hints && mode !== 'praesentation' && (() => {
+          const variant = room.variants.find((v) => v.id === room.activeVariantId);
+          const hints = checkWayfinding(plan, variant?.placed ?? [], projectDismissed);
+          return hints.map((h) => (
+            <g key={h.key} data-testid="wayhint">
+              <circle cx={tx(h.at.x)} cy={ty(h.at.y)} r={8} fill="rgba(200,85,61,0.15)" stroke="#C8553D" strokeWidth={1} strokeDasharray="2 1.5" />
+              <text x={tx(h.at.x)} y={ty(h.at.y)} fill="#C8553D" fontSize={10} fontWeight={700} textAnchor="middle" dy={3} pointerEvents="none">!</text>
+              <title>{t(h.messageKey)}</title>
+              <circle
+                cx={tx(h.at.x) + 9}
+                cy={ty(h.at.y) - 9}
+                r={5}
+                fill="rgba(0,0,0,0.4)"
+                style={{ cursor: 'pointer' }}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  onDismissHint?.(h.key);
+                }}
+                data-testid="wayhint-dismiss"
+              />
+              <text x={tx(h.at.x) + 9} y={ty(h.at.y) - 9} fill="#fff" fontSize={7} textAnchor="middle" dy={2.5} pointerEvents="none">×</text>
+            </g>
+          ));
+        })()}
+
         {/* W6: Raum-Etikett (Name · Fläche · Umfang), Doppelklick = umbenennen */}
         {(() => {
           const c = polygonCentroid(pts);
@@ -1243,17 +1277,20 @@ export function PlanEditor({
           ⊾
         </button>
         {/* Ebenen-Schalter (Erweiterung 8 · T11) */}
-        {(['electro', 'heat', 'pins'] as const).map((ly) => (
-          <button
-            key={ly}
-            className={`px-1.5 py-1 text-[10px] border rounded bg-surface ${layers[ly] ? 'border-gold/60 text-gold' : 'border-line text-muted line-through'}`}
-            onClick={() => setLayers((s) => ({ ...s, [ly]: !s[ly] }))}
-            title={`${t('layers.title')}: ${t(`layers.${ly}`)}`}
-            data-testid={`layer-${ly}`}
-          >
-            {t(`layers.${ly}`)}
-          </button>
-        ))}
+        {(['electro', 'heat', 'pins', 'hints'] as const)
+          .filter((ly) => ly !== 'hints' || mode !== 'praesentation')
+          .filter((ly) => ly !== 'pins' || internalAllowed)
+          .map((ly) => (
+            <button
+              key={ly}
+              className={`px-1.5 py-1 text-[10px] border rounded bg-surface ${layers[ly] ? 'border-gold/60 text-gold' : 'border-line text-muted line-through'}`}
+              onClick={() => setLayers((s) => ({ ...s, [ly]: !s[ly] }))}
+              title={`${t('layers.title')}: ${t(`layers.${ly}`)}`}
+              data-testid={`layer-${ly}`}
+            >
+              {t(`layers.${ly}`)}
+            </button>
+          ))}
         <button
           className="px-2 py-1 text-[11px] border border-line rounded bg-surface text-muted hover:text-text"
           onClick={() => setShowHelp(true)}
