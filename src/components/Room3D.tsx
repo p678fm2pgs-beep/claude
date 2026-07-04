@@ -89,7 +89,11 @@ export function Room3D({
     // S12: optional Tageslicht (neutral-weiß, heller) statt warmem Abendlicht.
     scene.add(new THREE.HemisphereLight(0xffffff, 0xb9b2a4, daylight ? 1.15 : 0.9));
     const dir = new THREE.DirectionalLight(daylight ? 0xffffff : 0xfff4e0, daylight ? 1.9 : 1.6);
-    dir.position.set(span, span * 2 + 2, span * 0.6);
+    // Erweiterung 7 · W7: Tageslicht folgt der Nordausrichtung des Plans
+    // (Sonne aus Süden = gegenüber von Nord).
+    const northRad = (((room.floorplan.northAngleDeg ?? 0) + 180) * Math.PI) / 180;
+    if (daylight) dir.position.set(Math.sin(northRad) * span, span * 2 + 2, Math.cos(northRad) * span);
+    else dir.position.set(span, span * 2 + 2, span * 0.6);
     dir.castShadow = true;
     dir.shadow.mapSize.set(2048, 2048);
     const sr = span * 1.3 + 1;

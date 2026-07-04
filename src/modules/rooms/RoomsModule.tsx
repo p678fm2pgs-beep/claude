@@ -18,6 +18,7 @@ import {
   LIMITS,
 } from '../../lib/validation';
 import { reassignOpenings } from '../../lib/planEditor';
+import { exportAufmassPdf } from '../pdf/exportAufmass';
 import type { RoomType, Opening, Floorplan, DoorType, WindowType, Point, InnerWall, Room } from '../../types';
 import { Plus, Copy, Trash2, Undo2, Redo2, X, FlipHorizontal2, ArrowLeftRight } from 'lucide-react';
 
@@ -392,6 +393,15 @@ function RoomEditor({
           </div>
           <span className="eyebrow">{t('rooms.title')}</span>
           <div className="flex gap-1">
+            {/* Erweiterung 7 · W7: Aufmaß-Export (ohne Preise) */}
+            <button
+              className="btn btn-ghost px-2 py-1 text-xs"
+              onClick={() => exportAufmassPdf(project, useStore.getState().lang)}
+              title={t('rooms.aufmass')}
+              data-testid="export-aufmass"
+            >
+              {t('rooms.aufmass')}
+            </button>
             <button className="btn btn-ghost px-2 py-1" onClick={undo} disabled={!canUndo} title={t('rooms.undo')} data-testid="undo">
               <Undo2 size={14} />
             </button>

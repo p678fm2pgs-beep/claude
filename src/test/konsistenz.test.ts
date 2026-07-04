@@ -321,3 +321,38 @@ describe('W6 — Raum-Etikett + Messwerkzeug', () => {
     expect(deriveAreas(withM, 270)).toEqual(deriveAreas(plan(), 270));
   });
 });
+
+// ═══════════ Erweiterung 7 · W7: Aufmaß-PDF + Maßstab ═══════════
+import { buildAufmassPdf, pickScale } from '../modules/pdf/exportAufmass';
+import type { Project } from '../types';
+
+describe('W7 — Aufmaß-PDF', () => {
+  function projectFor(): Project {
+    const r = roomForW5();
+    r.floorplan.measurements = [{ id: 'm1', a: { x: 0, y: 0 }, b: { x: 500, y: 400 } }];
+    r.floorplan.northAngleDeg = 30;
+    r.floorplan.innerWalls = [
+      { id: 'iw1', a: { x: 250, y: 0 }, b: { x: 250, y: 200 }, thicknessCm: 11.5, wallType: 'trockenbau' },
+    ];
+    return {
+      id: 'p1', schemaVersion: 3, name: 'Aufmaß Test', created: 1, modified: 2,
+      priceListDate: '06/2026', rooms: [r],
+      settings: { reservePercent: 10, fee: { type: 'prozent', value: 12 }, vatPercent: 19, paintCoverage: 8 },
+    } as Project;
+  }
+
+  it('pickScale: wählt 1:50 wenn es passt, sonst gröber', () => {
+    expect(pickScale(500, 400, 160, 150)).toBe(50); // 100×80 mm bei 1:50 → passt
+    expect(pickScale(1500, 1200, 160, 150)).toBe(100); // 150×120 mm bei 1:100
+    expect(pickScale(6000, 6000, 160, 150)).toBe(200); // Notnagel
+  });
+
+  it('baut je Raum eine Seite + Raumliste, ohne Fehler, ohne Preise', () => {
+    const doc = buildAufmassPdf(projectFor(), 'de');
+    expect(doc.getNumberOfPages()).toBe(2); // 1 Raum + Raumliste
+  });
+
+  it('englische Ausgabe baut ebenfalls', () => {
+    expect(() => buildAufmassPdf(projectFor(), 'en')).not.toThrow();
+  });
+});

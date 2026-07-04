@@ -96,6 +96,14 @@ export function PlanEditor({
   const [measureCursor, setMeasureCursor] = useState<Point | null>(null);
   const [sessionMeasures, setSessionMeasures] = useState<SessionMeasure[]>([]);
   const [renaming, setRenaming] = useState<string | null>(null);
+  // ── W7: Nordpfeil, Raster, Lineale ──
+  const [showGrid, setShowGrid] = useState(false);
+  const [gridStep, setGridStep] = useState(50); // cm
+  const [showRulers, setShowRulers] = useState(false);
+  const [northEdit, setNorthEdit] = useState(false);
+  const [cursorPos, setCursorPos] = useState<Point | null>(null);
+  const northDrag = useRef(false);
+  const [northLive, setNorthLive] = useState<number | null>(null);
 
   if (pts.length < 3) return null;
 
@@ -187,6 +195,16 @@ export function PlanEditor({
 
   const moveDrag = (e: React.PointerEvent) => {
     const st = drag.current;
+    setCursorPos(toWorld(e));
+    // W7: Nordpfeil per Drag drehen
+    if (northDrag.current) {
+      const rect = svgRef.current!.getBoundingClientRect();
+      const cx = rect.left + (rect.width * (width - 34)) / width;
+      const cy = rect.top + (rect.height * 34) / height;
+      const deg = (Math.atan2(e.clientX - cx, -(e.clientY - cy)) * 180) / Math.PI;
+      setNorthLive(((Math.round(deg) % 360) + 360) % 360);
+      return;
+    }
     if (tool === 'measure') {
       setMeasureCursor(snapMeasurePoint(plan, toWorld(e)));
       return;
@@ -223,6 +241,18 @@ export function PlanEditor({
   };
 
   const endDrag = () => {
+    // W7: Nordpfeil-Drehung abschließen (EIN Undo-Schritt)
+    if (northDrag.current) {
+      northDrag.current = false;
+      if (northLive !== null) {
+        const deg = northLive;
+        commit((fp) => {
+          fp.northAngleDeg = deg;
+        });
+      }
+      setNorthLive(null);
+      return;
+    }
     const st = drag.current;
     drag.current = null;
     setSwitchPreview(null);
@@ -357,7 +387,80 @@ export function PlanEditor({
         }}
         data-testid="floorplan-svg"
       >
+        {/* W7: cm/m-Raster (zurückhaltend) */}
+        {showGrid && (() => {
+          const lines: React.ReactNode[] = [];
+          const startX = Math.floor(minX / gridStep) * gridStep;
+          const endX = minX + spanX;
+          const startY = Math.floor(minY / gridStep) * gridStep;
+          const endY = minY + spanY;
+          for (let gx = startX; gx <= endX + gridStep; gx += gridStep) {
+            const major = Math.round(gx) % 100 === 0;
+            lines.push(<line key={`gx${gx}`} x1={tx(gx)} y1={ty(startY - gridStep)} x2={tx(gx)} y2={ty(endY + gridStep)} stroke="#1A1814" strokeWidth={major ? 0.5 : 0.25} opacity={major ? 0.14 : 0.07} />);
+          }
+          for (let gy = startY; gy <= endY + gridStep; gy += gridStep) {
+            const major = Math.round(gy) % 100 === 0;
+            lines.push(<line key={`gy${gy}`} x1={tx(startX - gridStep)} y1={ty(gy)} x2={tx(endX + gridStep)} y2={ty(gy)} stroke="#1A1814" strokeWidth={major ? 0.5 : 0.25} opacity={major ? 0.14 : 0.07} />);
+          }
+          return <g data-testid="plan-grid">{lines}</g>;
+        })()}
+
         <polygon points={poly} fill="rgba(0,0,0,0.04)" stroke="#1A1814" strokeWidth={2} />
+
+        {/* W7: Lineale oben/links mit Cursor-Marker */}
+        {showRulers && (() => {
+          const ticks: React.ReactNode[] = [];
+          for (let gx = Math.ceil(minX / 50) * 50; gx <= minX + spanX; gx += 50) {
+            const major = Math.round(gx) % 100 === 0;
+            ticks.push(<line key={`rx${gx}`} x1={tx(gx)} y1={10} x2={tx(gx)} y2={major ? 18 : 14} stroke="#6b6256" strokeWidth={0.8} />);
+            if (major) ticks.push(<text key={`rxt${gx}`} x={tx(gx)} y={8} fill="#6b6256" fontSize={7} textAnchor="middle">{(gx / CM_PER_M).toFixed(0)}</text>);
+          }
+          for (let gy = Math.ceil(minY / 50) * 50; gy <= minY + spanY; gy += 50) {
+            const major = Math.round(gy) % 100 === 0;
+            ticks.push(<line key={`ry${gy}`} x1={10} y1={ty(gy)} x2={major ? 18 : 14} y2={ty(gy)} stroke="#6b6256" strokeWidth={0.8} />);
+            if (major) ticks.push(<text key={`ryt${gy}`} x={7} y={ty(gy) + 2} fill="#6b6256" fontSize={7} textAnchor="middle">{(gy / CM_PER_M).toFixed(0)}</text>);
+          }
+          return (
+            <g data-testid="plan-rulers">
+              <line x1={10} y1={10} x2={width - 10} y2={10} stroke="#6b6256" strokeWidth={0.8} />
+              <line x1={10} y1={10} x2={10} y2={height - 10} stroke="#6b6256" strokeWidth={0.8} />
+              {ticks}
+              {cursorPos && (
+                <>
+                  <line x1={tx(cursorPos.x)} y1={10} x2={tx(cursorPos.x)} y2={18} stroke="#C9A84C" strokeWidth={1.5} />
+                  <line x1={10} y1={ty(cursorPos.y)} x2={18} y2={ty(cursorPos.y)} stroke="#C9A84C" strokeWidth={1.5} />
+                </>
+              )}
+            </g>
+          );
+        })()}
+
+        {/* W7: dezenter Nordpfeil (per Drag drehbar) */}
+        {(() => {
+          const deg = northLive ?? plan.northAngleDeg ?? 0;
+          const cx = width - 34;
+          const cy = 34;
+          return (
+            <g
+              transform={`rotate(${deg} ${cx} ${cy})`}
+              style={{ cursor: 'grab' }}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                northDrag.current = true;
+                (e.currentTarget as Element).setPointerCapture(e.pointerId);
+              }}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                setNorthEdit(true);
+              }}
+              data-testid="north-arrow"
+            >
+              <circle cx={cx} cy={cy} r={14} fill="none" stroke="#9A958A" strokeWidth={0.8} opacity={0.7} />
+              <path d={`M ${cx} ${cy - 11} L ${cx - 4} ${cy + 6} L ${cx} ${cy + 2} L ${cx + 4} ${cy + 6} Z`} fill="#C9A84C" opacity={0.9} />
+              <text x={cx} y={cy - 16} fill="#6b6256" fontSize={8} textAnchor="middle">N</text>
+            </g>
+          );
+        })()}
 
         {/* Umriss-Wände: Klickflächen + Eigenschaften-Anzeige (W4) */}
         {tool === 'select' &&
@@ -721,6 +824,26 @@ export function PlanEditor({
             {measureStart ? t('editor.measureHint2') : t('editor.measureHint1')}
           </span>
         )}
+        <button
+          className={`px-2 py-1 text-[11px] border rounded bg-surface ${showGrid ? 'border-gold text-gold' : 'border-line text-muted hover:text-text'}`}
+          onClick={() => {
+            if (showGrid && gridStep === 50) setGridStep(25);
+            else if (showGrid && gridStep === 25) { setShowGrid(false); setGridStep(50); }
+            else setShowGrid(true);
+          }}
+          title={t('editor.grid')}
+          data-testid="toggle-grid"
+        >
+          # {showGrid ? `${gridStep}` : ''}
+        </button>
+        <button
+          className={`px-2 py-1 text-[11px] border rounded bg-surface ${showRulers ? 'border-gold text-gold' : 'border-line text-muted hover:text-text'}`}
+          onClick={() => setShowRulers((v) => !v)}
+          title={t('editor.rulers')}
+          data-testid="toggle-rulers"
+        >
+          ⊾
+        </button>
         {(sessionMeasures.length > 0 || (plan.measurements ?? []).length > 0) && (
           <button
             className="px-2 py-1 text-[11px] border border-line rounded bg-surface text-muted hover:text-danger"
@@ -864,6 +987,30 @@ export function PlanEditor({
           <button className="ml-2 text-muted hover:text-text" onClick={() => { setPlacing(null); setGhost(null); }} aria-label={t('common.cancel')}>
             <X size={10} />
           </button>
+        </div>
+      )}
+
+      {/* W7: Nordwinkel exakt eingeben (Doppelklick auf den Nordpfeil) */}
+      {northEdit && (
+        <div className="absolute top-12 right-1 flex items-center gap-1 bg-surface/95 border border-line rounded px-2 py-1" data-testid="north-edit">
+          <span className="text-[11px] text-muted">{t('editor.north')} (°):</span>
+          <input
+            className="field-input text-xs w-16 py-0.5"
+            autoFocus
+            defaultValue={Math.round(plan.northAngleDeg ?? 0)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const v = Number((e.target as HTMLInputElement).value.replace(',', '.'));
+                if (Number.isFinite(v)) {
+                  commit((fp) => {
+                    fp.northAngleDeg = ((Math.round(v) % 360) + 360) % 360;
+                  });
+                }
+                setNorthEdit(false);
+              } else if (e.key === 'Escape') setNorthEdit(false);
+            }}
+            data-testid="north-edit-input"
+          />
         </div>
       )}
 
