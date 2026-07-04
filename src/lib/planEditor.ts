@@ -148,3 +148,153 @@ export function offsetFromCorner(
   const desired = side === 'links' ? valueCm : len - valueCm - o.widthCm;
   return clampOpeningOffset(plan, o.wallIndex, o.widthCm, desired, o.id);
 }
+
+// ═══════════ Erweiterung 7 · W4: freies Wand-Werkzeug ═══════════
+import type { InnerWall } from '../types';
+
+/** Fangkandidaten für einen Wandpunkt: Ecken, Wand-Fußpunkte, Wandmitten, Raster. */
+export function snapWallPoint(
+  points: Point[],
+  innerWalls: InnerWall[] | undefined,
+  p: Point,
+  gridCm = 10,
+  snapDistCm = 15,
+): Point {
+  let best: { pt: Point; d: number } | null = null;
+  const consider = (pt: Point) => {
+    const d = Math.hypot(pt.x - p.x, pt.y - p.y);
+    if (d <= snapDistCm && (!best || d < best.d)) best = { pt, d };
+  };
+  // Ecken + Wandmitten des Umrisses
+  for (let i = 0; i < points.length; i++) {
+    consider(points[i]);
+    const b = points[(i + 1) % points.length];
+    consider({ x: (points[i].x + b.x) / 2, y: (points[i].y + b.y) / 2 });
+  }
+  // Endpunkte bestehender Innenwände
+  for (const w of innerWalls ?? []) {
+    consider(w.a);
+    consider(w.b);
+  }
+  if (best !== null) return (best as { pt: Point; d: number }).pt;
+  // Fußpunkt auf der nächstgelegenen Umriss-Wand (Punkt liegt AUF der Wandlinie)
+  for (let i = 0; i < points.length; i++) {
+    const { s, distCm } = projectOntoWall(points, i, p);
+    const len = wallLengthCm(points, i);
+    if (distCm <= snapDistCm && s >= 0 && s <= len) {
+      return pointOnWall(points, i, Math.round(s / gridCm) * gridCm);
+    }
+  }
+  // Raster
+  return { x: Math.round(p.x / gridCm) * gridCm, y: Math.round(p.y / gridCm) * gridCm };
+}
+
+/** Winkel-Einrasten der Zugrichtung auf 0/45/90° (free = ohne Einrasten). */
+export function snapWallDirection(a: Point, raw: Point, free = false): Point {
+  if (free) return raw;
+  const dx = raw.x - a.x;
+  const dy = raw.y - a.y;
+  const len = Math.hypot(dx, dy);
+  if (len < 1) return raw;
+  const angle = Math.atan2(dy, dx);
+  const step = Math.PI / 4; // 45°
+  const snapped = Math.round(angle / step) * step;
+  return { x: a.x + Math.cos(snapped) * len, y: a.y + Math.sin(snapped) * len };
+}
+
+/** Punkt in exakter Länge (cm) entlang der aktuellen Zugrichtung. */
+export function exactLengthPoint(a: Point, towards: Point, lengthCm: number): Point {
+  const dx = towards.x - a.x;
+  const dy = towards.y - a.y;
+  const len = Math.hypot(dx, dy) || 1;
+  return { x: a.x + (dx / len) * lengthCm, y: a.y + (dy / len) * lengthCm };
+}
+
+/** Liegt der Punkt (Toleranz cm) auf einer Umriss-Wand? → { wallIndex, s } */
+export function pointOnBoundary(
+  points: Point[],
+  p: Point,
+  tolCm = 2,
+): { wallIndex: number; s: number } | null {
+  for (let i = 0; i < points.length; i++) {
+    const { s, distCm } = projectOntoWall(points, i, p);
+    const len = wallLengthCm(points, i);
+    if (distCm <= tolCm && s >= tolCm && s <= len - tolCm) return { wallIndex: i, s };
+  }
+  return null;
+}
+
+export interface PolygonSplit {
+  polyA: Point[];
+  polyB: Point[];
+}
+
+/**
+ * Teilt ein Polygon durch eine Sehne cutA→cutB (beide Punkte auf verschiedenen
+ * Umriss-Wänden). null, wenn die Punkte nicht auf zwei verschiedenen Wänden liegen.
+ */
+export function splitPolygon(points: Point[], cutA: Point, cutB: Point): PolygonSplit | null {
+  const ha = pointOnBoundary(points, cutA);
+  const hb = pointOnBoundary(points, cutB);
+  if (!ha || !hb || ha.wallIndex === hb.wallIndex) return null;
+  const n = points.length;
+  let ia = ha.wallIndex;
+  let ib = hb.wallIndex;
+  let A = cutA;
+  let B = cutB;
+  if (ia > ib) {
+    // normieren: ia < ib (A auf der früheren Wand)
+    [ia, ib] = [ib, ia];
+    [A, B] = [B, A];
+  }
+  // polyA: A → pts[ia+1 … ib] → B
+  const polyA: Point[] = [A];
+  for (let k = ia + 1; k <= ib; k++) polyA.push(points[k % n]);
+  polyA.push(B);
+  // polyB: B → pts[ib+1 … ia (über 0)] → A
+  const polyB: Point[] = [B];
+  for (let k = ib + 1; k <= ia + n; k++) polyB.push(points[k % n]);
+  polyB.push(A);
+  if (polyA.length < 3 || polyB.length < 3) return null;
+  return { polyA, polyB };
+}
+
+/**
+ * Ordnet nach einer Teilung jede Öffnung dem richtigen Teil-Polygon zu und
+ * berechnet wallIndex/offset neu (über den Mittelpunkt der Öffnung).
+ */
+export function reassignOpenings(
+  openings: Opening[],
+  original: Point[],
+  polyA: Point[],
+  polyB: Point[],
+): { forA: Opening[]; forB: Opening[] } {
+  const forA: Opening[] = [];
+  const forB: Opening[] = [];
+  for (const o of openings) {
+    const len = wallLengthCm(original, o.wallIndex);
+    const mid = pointOnWall(original, o.wallIndex, Math.min(len, o.offsetCm + o.widthCm / 2));
+    const inA = locate(polyA, mid);
+    const inB = locate(polyB, mid);
+    const target = inA && (!inB || inA.distCm <= inB.distCm) ? 'A' : inB ? 'B' : null;
+    if (!target) continue;
+    const hit = target === 'A' ? inA! : inB!;
+    const poly = target === 'A' ? polyA : polyB;
+    const wallLen = wallLengthCm(poly, hit.wallIndex);
+    const newOffset = Math.max(0, Math.min(wallLen - o.widthCm, hit.s - o.widthCm / 2));
+    const copy: Opening = { ...o, wallIndex: hit.wallIndex, offsetCm: newOffset };
+    (target === 'A' ? forA : forB).push(copy);
+  }
+  return { forA, forB };
+
+  function locate(poly: Point[], p: Point): { wallIndex: number; s: number; distCm: number } | null {
+    let best: { wallIndex: number; s: number; distCm: number } | null = null;
+    for (let i = 0; i < poly.length; i++) {
+      const { s, distCm } = projectOntoWall(poly, i, p);
+      const len = wallLengthCm(poly, i);
+      if (s < -1 || s > len + 1) continue;
+      if (distCm <= 3 && (!best || distCm < best.distCm)) best = { wallIndex: i, s: Math.max(0, Math.min(len, s)), distCm };
+    }
+    return best;
+  }
+}

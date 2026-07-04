@@ -8,7 +8,7 @@
  * sonst unverändert.
  */
 import { useRef, useState } from 'react';
-import type { Floorplan, Opening, Point, Room } from '../types';
+import type { Floorplan, InnerWall, Opening, Point, Room, WallType } from '../types';
 import { CM_PER_M, wallLengthCm } from '../lib/geometry';
 import { openingSymbol, inwardNormal } from '../lib/planSymbols';
 import {
@@ -18,12 +18,20 @@ import {
   offsetFromCorner,
   clampOpeningOffset,
   projectOntoWall,
+  snapWallPoint,
+  snapWallDirection,
+  exactLengthPoint,
+  pointOnBoundary,
+  splitPolygon,
 } from '../lib/planEditor';
 import { useT } from '../hooks';
 import { uid } from '../lib/id';
-import { Copy, X } from 'lucide-react';
+import { Copy, X, MousePointer2, PenLine } from 'lucide-react';
 
 const PAD = 30;
+const WALL_THICKNESSES = [11.5, 17.5, 24, 36.5];
+
+type Tool = 'select' | 'wall';
 
 interface DragState {
   id: string;
@@ -39,11 +47,14 @@ export function PlanEditor({
   commit,
   width = 560,
   height = 360,
+  onSplitRoom,
 }: {
   room: Room;
   commit: (fn: (fp: Floorplan) => void) => void;
   width?: number;
   height?: number;
+  /** W4: Raum durch die neue Wand in zwei Räume teilen (Projekt-Ebene). */
+  onSplitRoom?: (polyA: Point[], polyB: Point[], wall: InnerWall) => void;
 }) {
   const t = useT();
   const plan = room.floorplan;
@@ -57,6 +68,14 @@ export function PlanEditor({
   const [editing, setEditing] = useState<{ side: 'links' | 'rechts'; value: string } | null>(null);
   const [placing, setPlacing] = useState<Opening | null>(null);
   const [ghost, setGhost] = useState<{ wallIndex: number; offsetCm: number } | null>(null);
+  // ── W4: Wand-Werkzeug ──
+  const [tool, setTool] = useState<Tool>('select');
+  const [wallStart, setWallStart] = useState<Point | null>(null);
+  const [wallCursor, setWallCursor] = useState<Point | null>(null);
+  const [lenBuf, setLenBuf] = useState('');
+  const [splitAsk, setSplitAsk] = useState<InnerWall | null>(null);
+  /** Ausgewählte Wand: Umriss-Index ODER Innenwand-ID. */
+  const [selWall, setSelWall] = useState<number | string | null>(null);
 
   if (pts.length < 3) return null;
 
@@ -85,6 +104,51 @@ export function PlanEditor({
       if (o) fn(o);
     });
 
+  // ── W4: Wand zeichnen ──
+  const wallSnapCursor = (raw: Point, freeAngle: boolean): Point => {
+    if (!wallStart) return snapWallPoint(pts, plan.innerWalls, raw);
+    const dir = snapWallDirection(wallStart, raw, freeAngle);
+    // Harte Fangpunkte (Ecken/Endpunkte) dürfen den Winkel brechen:
+    const hard = snapWallPoint(pts, plan.innerWalls, raw, 10, 12);
+    const hardIsCorner =
+      pts.some((c) => c.x === hard.x && c.y === hard.y) ||
+      (plan.innerWalls ?? []).some((w) => (w.a.x === hard.x && w.a.y === hard.y) || (w.b.x === hard.x && w.b.y === hard.y));
+    if (hardIsCorner && Math.hypot(hard.x - raw.x, hard.y - raw.y) <= 12) return hard;
+    // sonst: Richtung halten, Länge auf 5 cm runden
+    const len = Math.round(Math.hypot(dir.x - wallStart.x, dir.y - wallStart.y) / 5) * 5;
+    return exactLengthPoint(wallStart, dir, len);
+  };
+
+  const commitWall = (end: Point) => {
+    if (!wallStart) return;
+    if (Math.hypot(end.x - wallStart.x, end.y - wallStart.y) < 20) return;
+    const wall: InnerWall = { id: uid('iw'), a: wallStart, b: end, thicknessCm: 11.5, wallType: 'trockenbau' };
+    const onA = pointOnBoundary(pts, wall.a, 3);
+    const onB = pointOnBoundary(pts, wall.b, 3);
+    const crosses = onA && onB && onA.wallIndex !== onB.wallIndex && splitPolygon(pts, wall.a, wall.b) !== null;
+    if (crosses && onSplitRoom) {
+      setSplitAsk(wall);
+      setWallStart(null);
+    } else {
+      commit((fp) => {
+        fp.innerWalls = [...(fp.innerWalls ?? []), wall];
+      });
+      setWallStart(end); // Kettenmodus
+    }
+    setLenBuf('');
+  };
+
+  const wallToolClick = (e: React.PointerEvent) => {
+    const raw = toWorld(e);
+    if (!wallStart) {
+      const p = snapWallPoint(pts, plan.innerWalls, raw);
+      setWallStart(p);
+      setWallCursor(p);
+    } else {
+      commitWall(wallSnapCursor(raw, e.shiftKey));
+    }
+  };
+
   // ── Drag-Handler ──
   const startDrag = (e: React.PointerEvent, o: Opening) => {
     e.stopPropagation();
@@ -103,6 +167,11 @@ export function PlanEditor({
 
   const moveDrag = (e: React.PointerEvent) => {
     const st = drag.current;
+    if (tool === 'wall') {
+      const raw = toWorld(e);
+      setWallCursor(wallStart ? wallSnapCursor(raw, e.shiftKey) : snapWallPoint(pts, plan.innerWalls, raw));
+      return;
+    }
     if (placing) {
       const w = toWorld(e);
       const cand = nearestWall(pts, w);
@@ -160,10 +229,40 @@ export function PlanEditor({
 
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
+      if (wallStart) {
+        setWallStart(null);
+        setLenBuf('');
+      } else if (tool === 'wall') {
+        setTool('select');
+      }
       setPlacing(null);
       setGhost(null);
       setSelectedId(null);
       setEditing(null);
+      setSelWall(null);
+      return;
+    }
+    // W4: exakte Längeneingabe während des Ziehens (Ziffern + Enter)
+    if (tool === 'wall' && wallStart) {
+      if (/^[0-9.,]$/.test(e.key)) {
+        setLenBuf((b) => b + e.key);
+        return;
+      }
+      if (e.key === 'Backspace') {
+        setLenBuf((b) => b.slice(0, -1));
+        return;
+      }
+      if (e.key === 'Enter' && lenBuf && wallCursor) {
+        const v = Number(lenBuf.replace(',', '.'));
+        if (Number.isFinite(v) && v > 0) {
+          const cm = v <= 20 ? v * CM_PER_M : v; // ≤20 → Meter, sonst cm
+          commitWall(exactLengthPoint(wallStart, wallCursor, cm));
+        }
+        return;
+      }
+    }
+    if ((e.key === 'w' || e.key === 'W') && !wallStart) {
+      setTool((tl) => (tl === 'wall' ? 'select' : 'wall'));
     } else if ((e.key === 'd' || e.key === 'D') && selectedId) {
       duplicate();
     } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
@@ -171,6 +270,11 @@ export function PlanEditor({
         fp.openings = fp.openings.filter((o) => o.id !== selectedId);
       });
       setSelectedId(null);
+    } else if ((e.key === 'Delete' || e.key === 'Backspace') && typeof selWall === 'string') {
+      commit((fp) => {
+        fp.innerWalls = (fp.innerWalls ?? []).filter((w) => w.id !== selWall);
+      });
+      setSelWall(null);
     }
   };
 
@@ -193,15 +297,124 @@ export function PlanEditor({
         onPointerMove={moveDrag}
         onPointerUp={placing ? placeCopy : endDrag}
         onPointerLeave={endDrag}
-        onPointerDown={() => {
+        onPointerDown={(e) => {
+          if (tool === 'wall') {
+            wallToolClick(e);
+            return;
+          }
           if (!placing) {
             setSelectedId(null);
             setEditing(null);
+            setSelWall(null);
+          }
+        }}
+        onDoubleClick={() => {
+          if (tool === 'wall') {
+            setWallStart(null);
+            setLenBuf('');
           }
         }}
         data-testid="floorplan-svg"
       >
         <polygon points={poly} fill="rgba(0,0,0,0.04)" stroke="#1A1814" strokeWidth={2} />
+
+        {/* Umriss-Wände: Klickflächen + Eigenschaften-Anzeige (W4) */}
+        {tool === 'select' &&
+          pts.map((p, i) => {
+            const b = pts[(i + 1) % pts.length];
+            const props = plan.wallProps?.[i];
+            const isSel = selWall === i;
+            return (
+              <g key={`wp-${i}`}>
+                {(props?.loadbearing || isSel) && (
+                  <line
+                    x1={tx(p.x)} y1={ty(p.y)} x2={tx(b.x)} y2={ty(b.y)}
+                    stroke={isSel ? '#C9A84C' : '#1A1814'}
+                    strokeWidth={props?.loadbearing ? 5 : 4}
+                    opacity={isSel ? 0.9 : 0.8}
+                  />
+                )}
+                <line
+                  x1={tx(p.x)} y1={ty(p.y)} x2={tx(b.x)} y2={ty(b.y)}
+                  stroke="transparent" strokeWidth={12}
+                  style={{ cursor: 'pointer' }}
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    setSelWall(i);
+                    setSelectedId(null);
+                  }}
+                  data-testid={`wall-hit-${i}`}
+                />
+              </g>
+            );
+          })}
+
+        {/* Innenwände (W4) */}
+        {(plan.innerWalls ?? []).map((iw) => {
+          const isSel = selWall === iw.id;
+          const strokePx = Math.max(3, iw.thicknessCm * scale);
+          const color = iw.wallType === 'halbhoch' ? '#9B8F7A' : iw.loadbearing ? '#3A342C' : '#5C544A';
+          return (
+            <g key={iw.id}>
+              <line
+                x1={tx(iw.a.x)} y1={ty(iw.a.y)} x2={tx(iw.b.x)} y2={ty(iw.b.y)}
+                stroke={isSel ? '#C9A84C' : color}
+                strokeWidth={strokePx}
+                strokeLinecap="butt"
+                opacity={iw.wallType === 'halbhoch' ? 0.65 : 0.95}
+                data-testid={`inner-wall-${iw.id}`}
+              />
+              <line
+                x1={tx(iw.a.x)} y1={ty(iw.a.y)} x2={tx(iw.b.x)} y2={ty(iw.b.y)}
+                stroke="transparent" strokeWidth={Math.max(14, strokePx + 8)}
+                style={{ cursor: 'pointer' }}
+                onPointerDown={(e) => {
+                  if (tool !== 'select') return;
+                  e.stopPropagation();
+                  setSelWall(iw.id);
+                  setSelectedId(null);
+                }}
+              />
+              {isSel && (
+                <text
+                  x={(tx(iw.a.x) + tx(iw.b.x)) / 2}
+                  y={(ty(iw.a.y) + ty(iw.b.y)) / 2}
+                  fill="#C9A84C" fontSize={9} textAnchor="middle" dy={-6}
+                >
+                  {(Math.hypot(iw.b.x - iw.a.x, iw.b.y - iw.a.y) / CM_PER_M).toFixed(2)} m
+                </text>
+              )}
+            </g>
+          );
+        })}
+
+        {/* Wand-Vorschau mit Live-Meter (W4-Kern) */}
+        {tool === 'wall' && wallStart && wallCursor && (() => {
+          const lenM = Math.hypot(wallCursor.x - wallStart.x, wallCursor.y - wallStart.y) / CM_PER_M;
+          const angle = Math.round((Math.atan2(wallCursor.y - wallStart.y, wallCursor.x - wallStart.x) * 180) / Math.PI);
+          return (
+            <g data-testid="wall-preview">
+              <line
+                x1={tx(wallStart.x)} y1={ty(wallStart.y)} x2={tx(wallCursor.x)} y2={ty(wallCursor.y)}
+                stroke="#C9A84C" strokeWidth={4} strokeDasharray="8 4" strokeLinecap="round"
+              />
+              <circle cx={tx(wallStart.x)} cy={ty(wallStart.y)} r={4} fill="#C9A84C" />
+              <text
+                x={tx(wallCursor.x)} y={ty(wallCursor.y)}
+                fill="#C9A84C" fontSize={16} fontWeight={700} textAnchor="middle" dy={-14}
+                data-testid="wall-live-length"
+              >
+                {lenBuf ? `${lenBuf} ⏎` : `${lenM.toFixed(2)} m`}
+              </text>
+              <text x={tx(wallCursor.x)} y={ty(wallCursor.y)} fill="#6b6256" fontSize={9} textAnchor="middle" dy={-2}>
+                {((angle % 360) + 360) % 360}°
+              </text>
+            </g>
+          );
+        })()}
+        {tool === 'wall' && !wallStart && wallCursor && (
+          <circle cx={tx(wallCursor.x)} cy={ty(wallCursor.y)} r={4} fill="none" stroke="#C9A84C" strokeWidth={1.5} />
+        )}
 
         {/* Wand-Hervorhebung beim Wechsel */}
         {switchPreview !== null && (
@@ -310,6 +523,82 @@ export function PlanEditor({
         })()}
       </svg>
 
+      {/* Werkzeugleiste (W4) */}
+      <div className="absolute top-1 left-1 flex gap-1" data-testid="editor-tools">
+        <button
+          className={`px-2 py-1 text-[11px] border rounded inline-flex items-center gap-1 bg-surface ${tool === 'select' ? 'border-gold text-gold' : 'border-line text-muted hover:text-text'}`}
+          onClick={() => { setTool('select'); setWallStart(null); }}
+          title={`${t('editor.toolSelect')} (Esc)`}
+          data-testid="tool-select"
+        >
+          <MousePointer2 size={11} /> {t('editor.toolSelect')}
+        </button>
+        <button
+          className={`px-2 py-1 text-[11px] border rounded inline-flex items-center gap-1 bg-surface ${tool === 'wall' ? 'border-gold text-gold' : 'border-line text-muted hover:text-text'}`}
+          onClick={() => { setTool('wall'); setSelectedId(null); setSelWall(null); }}
+          title={`${t('editor.toolWall')} (W)`}
+          data-testid="tool-wall"
+        >
+          <PenLine size={11} /> {t('editor.toolWall')}
+        </button>
+        {tool === 'wall' && (
+          <span className="text-[10px] text-muted bg-surface/90 border border-line rounded px-2 py-1">
+            {wallStart ? t('editor.wallHint2') : t('editor.wallHint1')}
+          </span>
+        )}
+      </div>
+
+      {/* Wand-Eigenschaften (W4) */}
+      {selWall !== null && tool === 'select' && (
+        <WallPropsPanel
+          plan={plan}
+          selWall={selWall}
+          heightCm={room.heightCm}
+          commit={commit}
+          onClose={() => setSelWall(null)}
+          t={t}
+        />
+      )}
+
+      {/* Raum teilen? (W4) */}
+      {splitAsk && (
+        <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded" data-testid="split-dialog">
+          <div className="card p-4 max-w-xs text-center">
+            <p className="text-sm mb-1">{t('editor.splitTitle')}</p>
+            <p className="text-muted text-xs mb-4">{t('editor.splitBody')}</p>
+            <div className="flex flex-col gap-1.5">
+              <button
+                className="btn btn-primary text-xs py-1.5"
+                onClick={() => {
+                  const split = splitPolygon(pts, splitAsk.a, splitAsk.b);
+                  if (split && onSplitRoom) onSplitRoom(split.polyA, split.polyB, splitAsk);
+                  setSplitAsk(null);
+                }}
+                data-testid="split-confirm"
+              >
+                {t('editor.splitYes')}
+              </button>
+              <button
+                className="btn btn-ghost text-xs py-1.5"
+                onClick={() => {
+                  const wall = splitAsk;
+                  commit((fp) => {
+                    fp.innerWalls = [...(fp.innerWalls ?? []), wall];
+                  });
+                  setSplitAsk(null);
+                }}
+                data-testid="split-wall-only"
+              >
+                {t('editor.splitNo')}
+              </button>
+              <button className="btn btn-ghost text-xs py-1.5" onClick={() => setSplitAsk(null)}>
+                {t('common.cancel')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mini-Werkzeugleiste bei Auswahl */}
       {selected && !placing && (
         <div className="absolute top-1 right-1 flex gap-1">
@@ -356,6 +645,123 @@ export function PlanEditor({
             data-testid="corner-edit-input"
           />
         </div>
+      )}
+    </div>
+  );
+}
+
+/** Eigenschaften-Panel für Umriss- und Innenwände (W4). */
+function WallPropsPanel({
+  plan, selWall, heightCm, commit, onClose, t,
+}: {
+  plan: Floorplan;
+  selWall: number | string;
+  heightCm: number;
+  commit: (fn: (fp: Floorplan) => void) => void;
+  onClose: () => void;
+  t: (k: string, p?: Record<string, string | number>) => string;
+}) {
+  const isInner = typeof selWall === 'string';
+  const inner = isInner ? (plan.innerWalls ?? []).find((w) => w.id === selWall) : undefined;
+  const props = !isInner ? plan.wallProps?.[selWall as number] : undefined;
+  if (isInner && !inner) return null;
+
+  const thickness = isInner ? inner!.thicknessCm : (props?.thicknessCm ?? 24);
+  const wallType: WallType = isInner ? inner!.wallType : (props?.wallType ?? 'massiv');
+  const loadbearing = isInner ? !!inner!.loadbearing : !!props?.loadbearing;
+
+  const update = (fn: (target: { thicknessCm?: number; wallType?: WallType; loadbearing?: boolean; heightCm?: number }) => void) =>
+    commit((fp) => {
+      if (isInner) {
+        const w = (fp.innerWalls ?? []).find((x) => x.id === selWall);
+        if (w) fn(w as unknown as { thicknessCm?: number; wallType?: WallType; loadbearing?: boolean; heightCm?: number });
+      } else {
+        fp.wallProps = { ...(fp.wallProps ?? {}) };
+        const cur = { ...(fp.wallProps[selWall as number] ?? {}) };
+        fn(cur);
+        fp.wallProps[selWall as number] = cur;
+      }
+    });
+
+  const removeInner = () => {
+    if (loadbearing && !window.confirm(t('editor.deleteLoadbearing'))) return;
+    commit((fp) => {
+      fp.innerWalls = (fp.innerWalls ?? []).filter((w) => w.id !== selWall);
+    });
+    onClose();
+  };
+
+  return (
+    <div className="absolute top-8 right-1 bg-surface/95 border border-line rounded p-2.5 w-52 space-y-2" data-testid="wall-props">
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-medium">
+          {isInner ? t('editor.innerWall') : `${t('rooms.wall')} ${selWall}`}
+          {loadbearing && <span className="text-gold ml-1">· {t('editor.loadbearing')}</span>}
+        </p>
+        <button className="text-muted hover:text-text" onClick={onClose} aria-label={t('common.cancel')}>
+          <X size={12} />
+        </button>
+      </div>
+      <label className="block text-[10px] text-muted">
+        {t('editor.thickness')}
+        <select
+          className="field-input text-xs mt-0.5 py-1"
+          value={thickness}
+          onChange={(e) => update((w) => { w.thicknessCm = Number(e.target.value); })}
+          data-testid="wall-thickness"
+        >
+          {WALL_THICKNESSES.map((tc) => (
+            <option key={tc} value={tc}>{tc.toLocaleString('de-DE')} cm</option>
+          ))}
+          {!WALL_THICKNESSES.includes(thickness) && <option value={thickness}>{thickness} cm</option>}
+        </select>
+      </label>
+      <label className="block text-[10px] text-muted">
+        {t('editor.wallType')}
+        <select
+          className="field-input text-xs mt-0.5 py-1"
+          value={wallType}
+          onChange={(e) => update((w) => {
+            w.wallType = e.target.value as WallType;
+            if (e.target.value === 'halbhoch' && !w.heightCm) w.heightCm = 110;
+          })}
+          data-testid="wall-type"
+        >
+          <option value="massiv">{t('wallType.massiv')}</option>
+          <option value="trockenbau">{t('wallType.trockenbau')}</option>
+          {isInner && <option value="halbhoch">{t('wallType.halbhoch')}</option>}
+        </select>
+      </label>
+      {isInner && wallType === 'halbhoch' && (
+        <label className="block text-[10px] text-muted">
+          {t('editor.halfHeight')} ({Math.round(inner!.heightCm ?? 110)} cm)
+          <input
+            type="range" min={90} max={150} step={5}
+            className="w-full accent-[#C9A84C]"
+            value={inner!.heightCm ?? 110}
+            onChange={(e) => update((w) => { w.heightCm = Number(e.target.value); })}
+            data-testid="wall-half-height"
+          />
+        </label>
+      )}
+      <label className="flex items-center gap-1.5 text-[10px] text-muted cursor-pointer">
+        <input
+          type="checkbox"
+          checked={loadbearing}
+          onChange={(e) => update((w) => { w.loadbearing = e.target.checked; })}
+          data-testid="wall-loadbearing"
+        />
+        {t('editor.loadbearing')}
+      </label>
+      {!isInner && (
+        <p className="text-[9px] text-muted">
+          {t('editor.wallArea')}: {(wallLengthCm(plan.points, selWall as number) / CM_PER_M * (heightCm / CM_PER_M)).toFixed(2)} m²
+        </p>
+      )}
+      {isInner && (
+        <button className="btn btn-danger w-full text-[11px] py-1" onClick={removeInner} data-testid="wall-delete">
+          {t('common.delete')}
+        </button>
       )}
     </div>
   );

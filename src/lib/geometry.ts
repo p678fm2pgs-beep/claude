@@ -3,7 +3,7 @@
  * Alle Eingaben in Zentimetern, Flächen in Quadratmetern, Längen in Metern.
  * Deterministisch & vollständig unit-getestet.
  */
-import type { Floorplan, Point, Opening } from '../types';
+import type { Floorplan, Point, Opening, InnerWall } from '../types';
 
 export const CM_PER_M = 100;
 
@@ -56,12 +56,27 @@ export function totalOpeningAreaM2(openings: Opening[]): number {
 }
 
 /**
- * Netto-Wandfläche in m²: Umfang × Höhe − Σ Öffnungen.
- * Nie negativ.
+ * Anstrichfläche einer Innenwand in m² — BEIDSEITIG (Raumteiler werden von
+ * beiden Seiten gestrichen); halbhohe Wände mit eigener Höhe. (Erweiterung 7)
+ */
+export function innerWallAreaM2(w: InnerWall, roomHeightCm: number): number {
+  const len = Math.hypot(w.b.x - w.a.x, w.b.y - w.a.y) / CM_PER_M;
+  const h = (w.wallType === 'halbhoch' ? (w.heightCm ?? 110) : roomHeightCm) / CM_PER_M;
+  return 2 * len * h;
+}
+
+/** Summe aller Innenwand-Flächen eines Plans in m². (Erweiterung 7) */
+export function innerWallsAreaM2(plan: Floorplan, heightCm: number): number {
+  return (plan.innerWalls ?? []).reduce((sum, w) => sum + innerWallAreaM2(w, heightCm), 0);
+}
+
+/**
+ * Netto-Wandfläche in m²: Umfang × Höhe − Σ Öffnungen + Innenwände (beidseitig).
+ * Nie negativ. Altpläne ohne Innenwände liefern exakt die bisherigen Werte.
  */
 export function netWallAreaM2(plan: Floorplan, heightCm: number): number {
   const grossM2 = perimeterM(plan.points) * (heightCm / CM_PER_M);
-  const net = grossM2 - totalOpeningAreaM2(plan.openings);
+  const net = grossM2 - totalOpeningAreaM2(plan.openings) + innerWallsAreaM2(plan, heightCm);
   return Math.max(0, round2(net));
 }
 

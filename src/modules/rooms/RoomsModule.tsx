@@ -17,7 +17,8 @@ import {
   validateOpening,
   LIMITS,
 } from '../../lib/validation';
-import type { RoomType, Opening, Floorplan, DoorType, WindowType } from '../../types';
+import { reassignOpenings } from '../../lib/planEditor';
+import type { RoomType, Opening, Floorplan, DoorType, WindowType, Point, InnerWall, Room } from '../../types';
 import { Plus, Copy, Trash2, Undo2, Redo2, X, FlipHorizontal2, ArrowLeftRight } from 'lucide-react';
 
 const ROOM_TYPES: RoomType[] = [
@@ -278,6 +279,43 @@ function RoomEditor({
   const wallCount = room.floorplan.points.length;
   const variant = getActiveVariant(room);
 
+  /**
+   * Erweiterung 7 · W4: Raumteilung — Ursprungsraum behält Teil A (+ Möbel/Gewerke),
+   * neuer Raum erhält Teil B mit kopierten Farben/Materialien. Wandgebundene
+   * Zuordnungen (wallColors, wallIndex) werden zurückgesetzt, weil sich die
+   * Wandindizes beider Räume ändern. Öffnungen wandern zum richtigen Teilraum.
+   */
+  const splitRoom = (polyA: Point[], polyB: Point[], _wall: InnerWall) => {
+    updateProject((p) => {
+      const r = p.rooms.find((x) => x.id === roomId);
+      if (!r) return;
+      const { forA, forB } = reassignOpenings(r.floorplan.openings, r.floorplan.points, polyA, polyB);
+      const copy = JSON.parse(JSON.stringify(r)) as Room;
+      copy.id = uid('room');
+      copy.name = `${r.name} 2`;
+      copy.variants = copy.variants.map((v) => ({
+        ...v,
+        id: uid('var'),
+        wallColors: undefined,
+        materials: v.materials.map((m) => ({ ...m, id: uid('ms'), wallIndex: undefined })),
+        furniture: [],
+        trades: [],
+        lights: undefined,
+      }));
+      copy.activeVariantId = copy.variants[0].id;
+      copy.floorplan = { points: polyB, openings: forB };
+      r.floorplan.points = polyA;
+      r.floorplan.openings = forA;
+      r.floorplan.wallProps = undefined;
+      for (const v of r.variants) {
+        v.wallColors = undefined;
+        for (const m of v.materials) delete m.wallIndex;
+        v.lights?.forEach((l) => delete l.wallIndices);
+      }
+      p.rooms.push(copy);
+    });
+  };
+
   return (
     <div className="grid lg:grid-cols-[1fr_360px] gap-6" data-testid="room-editor">
       {/* Plan + Maßstab */}
@@ -357,8 +395,8 @@ function RoomEditor({
           ) : planView === 'realistisch' && variant ? (
             <RealisticPlan room={room} variant={variant} width={560} height={360} showDimensions />
           ) : (
-            /* Erweiterung 7 · W2: interaktiver Editor (Ziehen entlang der Wand, Live-Maße) */
-            <PlanEditor room={room} commit={commit} width={560} height={360} />
+            /* Erweiterung 7 · W2/W4: interaktiver Editor (Ziehen, Wand-Werkzeug, Live-Maße) */
+            <PlanEditor room={room} commit={commit} width={560} height={360} onSplitRoom={splitRoom} />
           )}
           <div className="flex items-center gap-2 mt-2 text-[#6b6256] text-xs">
             {planView === 'dreidimensional' ? (

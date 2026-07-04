@@ -240,6 +240,25 @@ export function Room3D({
       }
     }
 
+    // ── Innenwände / Raumteiler (Erweiterung 7 · W4) ──
+    for (const iw of room.floorplan.innerWalls ?? []) {
+      const A = { x: mapX(iw.a.x), z: mapZ(iw.a.y) };
+      const B = { x: mapX(iw.b.x), z: mapZ(iw.b.y) };
+      const len = Math.hypot(B.x - A.x, B.z - A.z);
+      if (len < 0.01) continue;
+      const h = (iw.wallType === 'halbhoch' ? (iw.heightCm ?? 110) : room.heightCm) / 100;
+      const geo = new THREE.BoxGeometry(len, h, Math.max(0.05, iw.thicknessCm / 100));
+      disposables.push(geo);
+      const mat = new THREE.MeshStandardMaterial({ color: '#E8E4DA', roughness: 0.9, transparent: true });
+      disposables.push(mat);
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.position.set((A.x + B.x) / 2, h / 2, (A.z + B.z) / 2);
+      mesh.rotation.y = Math.atan2(-(B.z - A.z), B.x - A.x);
+      scene.add(mesh);
+    }
+
     // ── Decke (S7e, einblendbar) ──
     if (showCeiling) {
       const ceilGeo = floorGeo.clone();
