@@ -11,10 +11,11 @@ import { MaterialsModule } from './materials/MaterialsModule';
 import { FurnitureModule } from './furniture/FurnitureModule';
 import { CostsModule } from './costs/CostsModule';
 import { BoardModule } from './board/BoardModule';
+import { InspirationModule } from './inspiration/InspirationModule';
 import { SettingsModule } from './settings/SettingsModule';
 import { ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
 
-type View = 'rooms' | 'light' | 'style' | 'colors' | 'materials' | 'furniture' | 'costs' | 'board' | 'settings';
+type View = 'rooms' | 'light' | 'style' | 'colors' | 'materials' | 'furniture' | 'costs' | 'board' | 'inspiration' | 'settings';
 
 const FLOW: View[] = ['rooms', 'light', 'style', 'colors', 'materials', 'furniture', 'costs', 'board'];
 const ROOM_VIEWS: View[] = ['light', 'style', 'colors', 'materials', 'furniture', 'board'];
@@ -46,6 +47,8 @@ export function Planner() {
     { view: 'furniture', label: t('nav.furniture') },
     { view: 'costs', label: t('nav.costs') },
     { view: 'board', label: t('nav.board') },
+    // Inspiration ist intern (Expertenmodus) — nie im Kunden-/Präsentationsmodus.
+    ...(mode === 'experte' ? [{ view: 'inspiration' as View, label: t('nav.inspiration') }] : []),
     { view: 'settings', label: t('nav.settings') },
   ];
 
@@ -89,6 +92,8 @@ export function Planner() {
         return <CostsModule />;
       case 'board':
         return <BoardModule roomId={room!.id} />;
+      case 'inspiration':
+        return <InspirationModule />;
       case 'settings':
         return <SettingsModule />;
     }

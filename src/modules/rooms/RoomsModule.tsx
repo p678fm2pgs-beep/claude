@@ -18,6 +18,7 @@ import {
   LIMITS,
 } from '../../lib/validation';
 import { reassignOpenings } from '../../lib/planEditor';
+import { compressImage } from '../../lib/image';
 import { exportAufmassPdf } from '../pdf/exportAufmass';
 import type { RoomType, Opening, Floorplan, DoorType, WindowType, Point, InnerWall, Room } from '../../types';
 import { Plus, Copy, Trash2, Undo2, Redo2, X, FlipHorizontal2, ArrowLeftRight } from 'lucide-react';
@@ -510,7 +511,101 @@ function RoomEditor({
             ))}
           </div>
         </div>
+
+        {/* Erweiterung 8 · T9: Aufmaß-Modus (Vor-Ort, große Touch-Elemente) */}
+        <AufmassPanel roomId={roomId} commit={commit} />
       </div>
+    </div>
+  );
+}
+
+/** Erweiterung 8 · T9: Vor-Ort-Aufmaß — Raumfotos + Bestandsmöbel-Schnellerfassung. */
+function AufmassPanel({
+  roomId,
+  commit,
+}: {
+  roomId: string;
+  commit: (fn: (fp: Floorplan, setHeight: (h: number) => void, room: Room) => void) => void;
+}) {
+  const t = useT();
+  const mode = useStore((s) => s.mode);
+  const project = useStore((s) => s.project)!;
+  const updateProject = useStore((s) => s.updateProject);
+  const room = getRoom(project, roomId)!;
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [savedFlash, setSavedFlash] = useState(false);
+  if (mode !== 'experte') return null;
+
+  const flashSaved = () => {
+    setSavedFlash(true);
+    setTimeout(() => setSavedFlash(false), 1200);
+  };
+
+  const addPhoto = async (files: FileList | null) => {
+    if (!files) return;
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith('image/')) continue;
+      const dataUrl = await compressImage(file, 1280);
+      updateProject((p) => {
+        const r = p.rooms.find((x) => x.id === roomId);
+        if (r) r.photos = [...(r.photos ?? []), dataUrl];
+      });
+      flashSaved();
+    }
+  };
+
+  const addBestand = () =>
+    commit((_fp, _h, r) => {
+      const v = r.variants.find((x) => x.id === r.activeVariantId);
+      if (!v) return;
+      const cx = (Math.min(...r.floorplan.points.map((p) => p.x)) + Math.max(...r.floorplan.points.map((p) => p.x))) / 2;
+      const cy = (Math.min(...r.floorplan.points.map((p) => p.y)) + Math.max(...r.floorplan.points.map((p) => p.y))) / 2;
+      v.placed = [
+        ...(v.placed ?? []),
+        {
+          id: uid('po'), typeId: 'schrank', label: t('aufmass.bestand'),
+          x: Math.round(cx), y: Math.round(cy), rotationDeg: 0,
+          widthCm: 100, depthCm: 60, heightCm: 200, shape: 'rect', tier: 'standard', bestand: true,
+        },
+      ];
+      flashSaved();
+    });
+
+  const removePhoto = (idx: number) =>
+    updateProject((p) => {
+      const r = p.rooms.find((x) => x.id === roomId);
+      if (r) r.photos = (r.photos ?? []).filter((_, i) => i !== idx);
+    });
+
+  const photos = room.photos ?? [];
+  return (
+    <div className="card p-4" data-testid="aufmass-panel">
+      <div className="flex items-center justify-between mb-3">
+        <span className="eyebrow">{t('aufmass.mode')}</span>
+        {savedFlash && <span className="text-ok text-xs" data-testid="aufmass-saved">✓ {t('aufmass.saved')}</span>}
+      </div>
+      <p className="text-muted text-xs mb-3">{t('aufmass.modeHint')}</p>
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={(e) => addPhoto(e.target.files)} data-testid="aufmass-photo-input" />
+      <div className="flex gap-2 flex-wrap">
+        <button className="btn btn-ghost flex-1 py-3" onClick={() => fileRef.current?.click()} data-testid="aufmass-add-photo">
+          {t('aufmass.photo')}
+        </button>
+        <button className="btn btn-ghost flex-1 py-3" onClick={addBestand} data-testid="aufmass-add-bestand">
+          {t('aufmass.bestand')}
+        </button>
+      </div>
+      {photos.length > 0 && (
+        <div className="grid grid-cols-3 gap-2 mt-3" data-testid="aufmass-photos">
+          {photos.map((src, i) => (
+            <div key={i} className="relative">
+              <img src={src} alt="" className="w-full h-20 object-cover rounded" />
+              <button className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-0.5" onClick={() => removePhoto(i)} aria-label={t('common.delete')}>
+                <X size={11} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

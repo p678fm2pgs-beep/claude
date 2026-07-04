@@ -382,6 +382,26 @@ for (const f of COLOR_FAMILIES) {
 
 export const ALL_TONES: ColorTone[] = COLOR_FAMILIES.flatMap((f) => f.tones);
 
+/** (Erweiterung 8 · T10) Nächste HAVEN-Töne zu einem HEX-Wert (Pipette). */
+export function nearestTones(hex: string, count = 3): ColorTone[] {
+  const v = hex.replace('#', '');
+  if (v.length < 6) return [];
+  const r = parseInt(v.slice(0, 2), 16);
+  const g = parseInt(v.slice(2, 4), 16);
+  const b = parseInt(v.slice(4, 6), 16);
+  return [...ALL_TONES]
+    .map((t) => {
+      const tv = t.hex.replace('#', '');
+      const dr = r - parseInt(tv.slice(0, 2), 16);
+      const dg = g - parseInt(tv.slice(2, 4), 16);
+      const db = b - parseInt(tv.slice(4, 6), 16);
+      return { t, d: dr * dr + dg * dg + db * db };
+    })
+    .sort((a, b2) => a.d - b2.d)
+    .slice(0, count)
+    .map((x) => x.t);
+}
+
 // ── Erweiterung 6 · S5: RAL-/NCS-/Hersteller-Töne überall zuweisbar ──
 
 /** Näherungs-LRV (Hellbezugswert) aus HEX — für Töne ohne gepflegten LRV. */

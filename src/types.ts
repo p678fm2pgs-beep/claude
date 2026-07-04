@@ -355,6 +355,8 @@ export interface Room {
   activeVariantId: string;
   /** (Erweiterung 8, optional) interne Notiz-Pins. */
   pins?: PlanPin[];
+  /** (Erweiterung 8, optional) Vor-Ort-Fotos je Raum (komprimiert, intern). */
+  photos?: string[];
 }
 
 export interface FeeSettings {
