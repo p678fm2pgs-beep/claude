@@ -12,7 +12,8 @@ import { computeRoomCost } from '../../lib/projectCost';
 import { uid } from '../../lib/id';
 import { formatEUR } from '../../lib/format';
 import type { Room } from '../../types';
-import { FileText, FileDown, Mail, Plus, Maximize2, GitCompare, BookOpen, ListChecks } from 'lucide-react';
+import { FileText, FileDown, Mail, Plus, Maximize2, GitCompare, BookOpen, ListChecks, PenTool } from 'lucide-react';
+import { ApprovalDialog } from './ApprovalDialog';
 
 export function BoardModule({ roomId }: { roomId: string }) {
   const t = useT();
@@ -24,6 +25,10 @@ export function BoardModule({ roomId }: { roomId: string }) {
   const room = getRoom(project, roomId)!;
   const variant = getActiveVariant(room)!;
   const [compare, setCompare] = useState(false);
+  // Erweiterung 8 · T7/T8: Lookbook-Optionen + Freigabe-Dialog.
+  const [lookbookCompare, setLookbookCompare] = useState(false);
+  const [lookbookApproval, setLookbookApproval] = useState(false);
+  const [approvalOpen, setApprovalOpen] = useState(false);
 
   const hasContent = variant.materials.length > 0 || Object.keys(variant.colorRoles).length > 0;
 
@@ -78,9 +83,16 @@ export function BoardModule({ roomId }: { roomId: string }) {
                 <FileDown size={15} /> {t('board.exportInternalPdf')}
               </button>
             )}
-            {/* Erweiterung 6 · S12: Lookbook + Musterbestell-Liste */}
-            <button className="btn btn-ghost" onClick={() => exportLookbookPdf(project, lang)} data-testid="export-lookbook">
+            {/* Erweiterung 6 · S12 / 8 · T7+T8: Lookbook mit Optionen */}
+            <button
+              className="btn btn-ghost"
+              onClick={() => exportLookbookPdf(project, lang, { compare: lookbookCompare, approval: lookbookApproval, internal: mode === 'experte' })}
+              data-testid="export-lookbook"
+            >
               <BookOpen size={15} /> {t('board.lookbook')}
+            </button>
+            <button className="btn btn-ghost" onClick={() => setApprovalOpen(true)} data-testid="approval-btn">
+              <PenTool size={15} /> {t('approval.sign')}
             </button>
             <button className="btn btn-ghost" onClick={() => downloadSampleCsv(project)} data-testid="export-samples">
               <ListChecks size={15} /> {t('board.sampleList')}
@@ -91,6 +103,24 @@ export function BoardModule({ roomId }: { roomId: string }) {
           </div>
         }
       />
+
+      {/* Erweiterung 8 · T7/T8: Lookbook-Optionen */}
+      <div className="flex items-center gap-4 mb-4 text-xs text-muted" data-testid="lookbook-options">
+        <span className="eyebrow">{t('export.options')}:</span>
+        <label className="flex items-center gap-1.5 cursor-pointer">
+          <input type="checkbox" checked={lookbookCompare} onChange={(e) => setLookbookCompare(e.target.checked)} data-testid="opt-compare" />
+          {t('export.compare')}
+        </label>
+        <label className="flex items-center gap-1.5 cursor-pointer">
+          <input type="checkbox" checked={lookbookApproval} onChange={(e) => setLookbookApproval(e.target.checked)} data-testid="opt-approval" />
+          {t('export.approval')}
+        </label>
+        {(project.approvals ?? []).length > 0 && (
+          <span className="text-ok" data-testid="approval-count">✓ {(project.approvals ?? []).length}× {t('approval.signedAt')}</span>
+        )}
+      </div>
+
+      {approvalOpen && <ApprovalDialog onClose={() => setApprovalOpen(false)} />}
 
       {/* Varianten-Leiste */}
       <div className="flex items-center gap-2 mb-5 flex-wrap">
