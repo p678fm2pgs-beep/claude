@@ -219,6 +219,109 @@ export interface LightSelection {
   wallIndices?: number[];
 }
 
+// ── Erweiterung 8: konfigurierbare Einrichtung, Elektro, Heizung (alle optional) ──
+
+export type ObjectShape = 'rect' | 'rund' | 'oval' | 'lform' | 'poly';
+
+export type KitchenSegmentKind =
+  | 'spuele'
+  | 'kochfeld'
+  | 'backofen'
+  | 'kuehlschrank'
+  | 'geschirrspueler'
+  | 'dunstabzug';
+
+/** Frei konfigurierbares, im Plan platziertes Einrichtungsobjekt. */
+export interface PlacedObject {
+  id: string;
+  /** FurnitureType-ID (Katalog) oder 'custom' | 'bestand'. */
+  typeId: string;
+  label?: string;
+  /** Mittelpunkt in cm. */
+  x: number;
+  y: number;
+  rotationDeg: number;
+  widthCm: number;
+  depthCm: number;
+  heightCm: number;
+  shape: ObjectShape;
+  /** L-Form: zweiter Schenkel (entlang der Breite am Ende, quer). */
+  l2?: { widthCm: number; depthCm: number };
+  /** Sonderform: Polygon relativ zum Mittelpunkt (cm). */
+  poly?: Point[];
+  tier: PriceTier;
+  /** Teppiche liegen UNTER Möbeln. */
+  layer?: 'teppich' | 'moebel';
+  /** Bestandsmöbel des Kunden (bleibt, zählt nicht in die Kalkulation). */
+  bestand?: boolean;
+  /** Küchen-Baukasten: Ausstattungs-Segmente entlang der Zeile (pos in cm ab Anfang). */
+  segments?: { posCm: number; kind: KitchenSegmentKind }[];
+  /** Material-/Farbvariante (Ton- oder Material-ID). */
+  finishId?: string;
+}
+
+export type ElectroKind =
+  | 'steckdose1'
+  | 'steckdose2'
+  | 'steckdose3'
+  | 'schalter'
+  | 'wechsel'
+  | 'doppel'
+  | 'deckenauslass'
+  | 'wandauslass'
+  | 'netzwerk'
+  | 'tv'
+  | 'herd';
+
+/** Elektro-Symbol: an Wand gedockt (wallIndex+offset) ODER frei (Deckenauslass). */
+export interface ElectroItem {
+  id: string;
+  kind: ElectroKind;
+  wallIndex?: number;
+  offsetCm?: number;
+  x?: number;
+  y?: number;
+  heightCm?: number;
+}
+
+/** Fußbodenheizungs-Zone (Polygon in cm). */
+export interface HeatZone {
+  id: string;
+  poly: Point[];
+}
+
+export type PinCategory = 'hinweis' | 'frage' | 'mangel' | 'todo';
+
+/** Interner Notiz-Pin im Plan (nie im Kunden-/Präsentationsmodus). */
+export interface PlanPin {
+  id: string;
+  x: number;
+  y: number;
+  category: PinCategory;
+  text: string;
+  /** komprimiertes Foto als DataURL (lokal). */
+  photo?: string;
+  done?: boolean;
+}
+
+/** Digitale Freigabe (T8). */
+export interface Approval {
+  id: string;
+  variantId: string;
+  roomId?: string;
+  signaturePng: string;
+  timestamp: number;
+  sumLabel: string;
+}
+
+/** Inspirationsbild (T10, intern). */
+export interface InspirationImage {
+  id: string;
+  dataUrl: string;
+  note: string;
+  fav?: boolean;
+}
+
 export interface Variant {
   id: string;
   name: string;
@@ -232,6 +335,12 @@ export interface Variant {
   trades: TradeSelection[];
   lighting: LightingScene[];
   notes: string;
+  /** (Erweiterung 8, optional) im Plan platzierte Einrichtung. */
+  placed?: PlacedObject[];
+  /** (Erweiterung 8, optional) Elektro-Planung light. */
+  electro?: ElectroItem[];
+  /** (Erweiterung 8, optional) FBH-Zonen. */
+  heatZones?: HeatZone[];
 }
 
 export interface Room {
@@ -244,6 +353,8 @@ export interface Room {
   stylePreset?: string;
   variants: Variant[];
   activeVariantId: string;
+  /** (Erweiterung 8, optional) interne Notiz-Pins. */
+  pins?: PlanPin[];
 }
 
 export interface FeeSettings {
@@ -270,6 +381,12 @@ export interface Project {
   priceListDate: string; // "MM/JJJJ"
   rooms: Room[];
   settings: ProjectSettings;
+  /** (Erweiterung 8, optional) digitale Freigaben. */
+  approvals?: Approval[];
+  /** (Erweiterung 8, optional) Inspirationssammlung (intern). */
+  inspiration?: InspirationImage[];
+  /** (Erweiterung 8, optional) ignorierte Laufwege-Hinweise (stabile Schlüssel). */
+  dismissedHints?: string[];
 }
 
 /** Editierbares Preislisten-Overlay (Expertenmodus). */
