@@ -26,15 +26,24 @@ import {
   splitWallAt,
   deleteWall,
   openingsOnWallPair,
+  polygonCentroid,
+  snapMeasurePoint,
 } from '../lib/planEditor';
+import { deriveAreas } from '../lib/geometry';
 import { useT } from '../hooks';
 import { uid } from '../lib/id';
-import { Copy, X, MousePointer2, PenLine } from 'lucide-react';
+import { Copy, X, MousePointer2, PenLine, Ruler } from 'lucide-react';
 
 const PAD = 30;
 const WALL_THICKNESSES = [11.5, 17.5, 24, 36.5];
 
-type Tool = 'select' | 'wall';
+type Tool = 'select' | 'wall' | 'measure';
+
+interface SessionMeasure {
+  id: string;
+  a: Point;
+  b: Point;
+}
 
 interface DragState {
   id: string;
@@ -82,6 +91,11 @@ export function PlanEditor({
   // ── W5: Wand teilen / löschen ──
   const [splittingWall, setSplittingWall] = useState<number | null>(null);
   const [deleteAsk, setDeleteAsk] = useState<number | null>(null);
+  // ── W6: Messwerkzeug + Raum-Etikett ──
+  const [measureStart, setMeasureStart] = useState<Point | null>(null);
+  const [measureCursor, setMeasureCursor] = useState<Point | null>(null);
+  const [sessionMeasures, setSessionMeasures] = useState<SessionMeasure[]>([]);
+  const [renaming, setRenaming] = useState<string | null>(null);
 
   if (pts.length < 3) return null;
 
@@ -173,6 +187,10 @@ export function PlanEditor({
 
   const moveDrag = (e: React.PointerEvent) => {
     const st = drag.current;
+    if (tool === 'measure') {
+      setMeasureCursor(snapMeasurePoint(plan, toWorld(e)));
+      return;
+    }
     if (tool === 'wall') {
       const raw = toWorld(e);
       setWallCursor(wallStart ? wallSnapCursor(raw, e.shiftKey) : snapWallPoint(pts, plan.innerWalls, raw));
@@ -248,6 +266,8 @@ export function PlanEditor({
       setSelWall(null);
       setSplittingWall(null);
       setDeleteAsk(null);
+      setMeasureStart(null);
+      setRenaming(null);
       return;
     }
     // W4: exakte Längeneingabe während des Ziehens (Ziffern + Enter)
@@ -271,6 +291,9 @@ export function PlanEditor({
     }
     if ((e.key === 'w' || e.key === 'W') && !wallStart) {
       setTool((tl) => (tl === 'wall' ? 'select' : 'wall'));
+    } else if (e.key === 'm' || e.key === 'M') {
+      setTool((tl) => (tl === 'measure' ? 'select' : 'measure'));
+      setMeasureStart(null);
     } else if ((e.key === 'd' || e.key === 'D') && selectedId) {
       duplicate();
     } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
@@ -308,6 +331,16 @@ export function PlanEditor({
         onPointerDown={(e) => {
           if (tool === 'wall') {
             wallToolClick(e);
+            return;
+          }
+          if (tool === 'measure') {
+            const p = snapMeasurePoint(plan, toWorld(e));
+            if (!measureStart) {
+              setMeasureStart(p);
+            } else {
+              setSessionMeasures((ms) => [...ms, { id: uid('mess'), a: measureStart, b: p }]);
+              setMeasureStart(null);
+            }
             return;
           }
           if (!placing) {
@@ -530,6 +563,115 @@ export function PlanEditor({
           );
         })}
 
+        {/* W6: Raum-Etikett (Name · Fläche · Umfang), Doppelklick = umbenennen */}
+        {(() => {
+          const c = polygonCentroid(pts);
+          const d = deriveAreas(plan, room.heightCm);
+          return (
+            <g data-testid="room-label">
+              <text
+                x={tx(c.x)} y={ty(c.y)}
+                fill="#1A1814" fontSize={13} fontWeight={600} textAnchor="middle"
+                style={{ cursor: 'text' }}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  setRenaming(room.name);
+                }}
+                data-testid="room-label-name"
+              >
+                {room.name}
+              </text>
+              <text x={tx(c.x)} y={ty(c.y)} fill="#6b6256" fontSize={9} textAnchor="middle" dy={13} pointerEvents="none">
+                {d.floorAreaM2.toFixed(2).replace('.', ',')} m² · {d.perimeterM.toFixed(2).replace('.', ',')} m
+              </text>
+            </g>
+          );
+        })()}
+
+        {/* W6: behaltene Messungen (persistiert) */}
+        {(plan.measurements ?? []).map((m) => {
+          const distM = Math.hypot(m.b.x - m.a.x, m.b.y - m.a.y) / CM_PER_M;
+          const mid = { x: (m.a.x + m.b.x) / 2, y: (m.a.y + m.b.y) / 2 };
+          return (
+            <g key={m.id} data-testid={`measure-kept-${m.id}`}>
+              <line x1={tx(m.a.x)} y1={ty(m.a.y)} x2={tx(m.b.x)} y2={ty(m.b.y)} stroke="#C9A84C" strokeWidth={1.2} />
+              <text x={tx(mid.x)} y={ty(mid.y)} fill="#C9A84C" fontSize={9} fontWeight={600} textAnchor="middle" dy={-3}>
+                {distM.toFixed(2).replace('.', ',')} m
+              </text>
+              <g
+                style={{ cursor: 'pointer' }}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  commit((fp) => {
+                    fp.measurements = (fp.measurements ?? []).filter((x) => x.id !== m.id);
+                  });
+                }}
+                data-testid={`measure-kept-delete-${m.id}`}
+              >
+                <circle cx={tx(mid.x) + 24} cy={ty(mid.y) - 6} r={6} fill="rgba(0,0,0,0.35)" />
+                <text x={tx(mid.x) + 24} y={ty(mid.y) - 6} fill="#fff" fontSize={8} textAnchor="middle" dy={2.5}>×</text>
+              </g>
+            </g>
+          );
+        })}
+
+        {/* W6: Sitzungs-Messungen (Klick auf Maßzahl = behalten) */}
+        {sessionMeasures.map((m) => {
+          const distM = Math.hypot(m.b.x - m.a.x, m.b.y - m.a.y) / CM_PER_M;
+          const mid = { x: (m.a.x + m.b.x) / 2, y: (m.a.y + m.b.y) / 2 };
+          return (
+            <g key={m.id} data-testid={`measure-${m.id}`}>
+              <line x1={tx(m.a.x)} y1={ty(m.a.y)} x2={tx(m.b.x)} y2={ty(m.b.y)} stroke="#6b6256" strokeWidth={1.2} strokeDasharray="5 3" />
+              <text
+                x={tx(mid.x)} y={ty(mid.y)}
+                fill="#1A1814" fontSize={9} fontWeight={600} textAnchor="middle" dy={-3}
+                style={{ cursor: 'pointer' }}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  // behalten → persistiert (erscheint im Aufmaß-PDF)
+                  commit((fp) => {
+                    fp.measurements = [...(fp.measurements ?? []), { id: m.id, a: m.a, b: m.b }];
+                  });
+                  setSessionMeasures((ms) => ms.filter((x) => x.id !== m.id));
+                }}
+                data-testid={`measure-keep-${m.id}`}
+              >
+                {distM.toFixed(2).replace('.', ',')} m ⊕
+              </text>
+              <g
+                style={{ cursor: 'pointer' }}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  setSessionMeasures((ms) => ms.filter((x) => x.id !== m.id));
+                }}
+              >
+                <circle cx={tx(mid.x) + 28} cy={ty(mid.y) - 6} r={6} fill="rgba(0,0,0,0.35)" />
+                <text x={tx(mid.x) + 28} y={ty(mid.y) - 6} fill="#fff" fontSize={8} textAnchor="middle" dy={2.5}>×</text>
+              </g>
+            </g>
+          );
+        })}
+
+        {/* W6: Mess-Vorschau */}
+        {tool === 'measure' && measureStart && measureCursor && (
+          <g data-testid="measure-preview">
+            <line
+              x1={tx(measureStart.x)} y1={ty(measureStart.y)} x2={tx(measureCursor.x)} y2={ty(measureCursor.y)}
+              stroke="#C9A84C" strokeWidth={1.5} strokeDasharray="5 3"
+            />
+            <text
+              x={(tx(measureStart.x) + tx(measureCursor.x)) / 2}
+              y={(ty(measureStart.y) + ty(measureCursor.y)) / 2}
+              fill="#C9A84C" fontSize={12} fontWeight={700} textAnchor="middle" dy={-6}
+            >
+              {(Math.hypot(measureCursor.x - measureStart.x, measureCursor.y - measureStart.y) / CM_PER_M).toFixed(2).replace('.', ',')} m
+            </text>
+          </g>
+        )}
+        {tool === 'measure' && measureCursor && (
+          <circle cx={tx(measureCursor.x)} cy={ty(measureCursor.y)} r={3.5} fill="none" stroke="#C9A84C" strokeWidth={1.5} />
+        )}
+
         {/* Geist beim Duplizieren */}
         {placing && ghost && (() => {
           const a = pts[ghost.wallIndex % pts.length];
@@ -566,6 +708,35 @@ export function PlanEditor({
         >
           <PenLine size={11} /> {t('editor.toolWall')}
         </button>
+        <button
+          className={`px-2 py-1 text-[11px] border rounded inline-flex items-center gap-1 bg-surface ${tool === 'measure' ? 'border-gold text-gold' : 'border-line text-muted hover:text-text'}`}
+          onClick={() => { setTool('measure'); setSelectedId(null); setSelWall(null); setWallStart(null); }}
+          title={`${t('editor.toolMeasure')} (M)`}
+          data-testid="tool-measure"
+        >
+          <Ruler size={11} /> {t('editor.toolMeasure')}
+        </button>
+        {tool === 'measure' && (
+          <span className="text-[10px] text-muted bg-surface/90 border border-line rounded px-2 py-1">
+            {measureStart ? t('editor.measureHint2') : t('editor.measureHint1')}
+          </span>
+        )}
+        {(sessionMeasures.length > 0 || (plan.measurements ?? []).length > 0) && (
+          <button
+            className="px-2 py-1 text-[11px] border border-line rounded bg-surface text-muted hover:text-danger"
+            onClick={() => {
+              setSessionMeasures([]);
+              if ((plan.measurements ?? []).length > 0) {
+                commit((fp) => {
+                  fp.measurements = [];
+                });
+              }
+            }}
+            data-testid="measure-clear-all"
+          >
+            {t('editor.clearMeasures')}
+          </button>
+        )}
         {tool === 'wall' && (
           <span className="text-[10px] text-muted bg-surface/90 border border-line rounded px-2 py-1">
             {wallStart ? t('editor.wallHint2') : t('editor.wallHint1')}
@@ -693,6 +864,38 @@ export function PlanEditor({
           <button className="ml-2 text-muted hover:text-text" onClick={() => { setPlacing(null); setGhost(null); }} aria-label={t('common.cancel')}>
             <X size={10} />
           </button>
+        </div>
+      )}
+
+      {/* W6: Raum umbenennen (Doppelklick aufs Etikett) */}
+      {renaming !== null && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded" data-testid="room-rename">
+          <div className="card p-3 flex items-center gap-2">
+            <input
+              className="field-input text-sm w-48"
+              autoFocus
+              value={renaming}
+              onChange={(e) => setRenaming(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const name = renaming.trim();
+                  if (name) commit((_fp, _h, r) => { r.name = name; });
+                  setRenaming(null);
+                } else if (e.key === 'Escape') setRenaming(null);
+              }}
+              data-testid="room-rename-input"
+            />
+            <button
+              className="btn btn-primary text-xs py-1.5"
+              onClick={() => {
+                const name = renaming.trim();
+                if (name) commit((_fp, _h, r) => { r.name = name; });
+                setRenaming(null);
+              }}
+            >
+              OK
+            </button>
+          </div>
         </div>
       )}
 

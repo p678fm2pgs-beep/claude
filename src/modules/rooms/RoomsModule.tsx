@@ -201,6 +201,9 @@ export function RoomsModule({
         </div>
       )}
 
+      {/* Erweiterung 7 · W6: aufklappbare Raumliste mit Summen */}
+      {project.rooms.length > 0 && <RoomList rooms={project.rooms} />}
+
       {room && <RoomEditor roomId={room.id} commit={commit} undo={undo} redo={redo} canUndo={history.current.length > 0} canRedo={future.current.length > 0} />}
     </div>
   );
@@ -490,6 +493,61 @@ function RoomEditor({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Erweiterung 7 · W6: Raumliste — alle Räume, Flächen, Summen (aufklappbar). */
+function RoomList({ rooms }: { rooms: Room[] }) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const derived = rooms.map((r) => ({ r, d: deriveAreas(r.floorplan, r.heightCm) }));
+  const sum = derived.reduce(
+    (acc, { d }) => ({
+      floor: acc.floor + d.floorAreaM2,
+      wall: acc.wall + d.netWallAreaM2,
+      per: acc.per + d.perimeterM,
+    }),
+    { floor: 0, wall: 0, per: 0 },
+  );
+  return (
+    <div className="card mb-8 overflow-hidden" data-testid="room-list">
+      <button className="w-full flex items-center justify-between p-3 text-left" onClick={() => setOpen((v) => !v)} data-testid="room-list-toggle">
+        <span className="eyebrow">{t('rooms.list')}</span>
+        <span className="text-muted text-xs">
+          {rooms.length} · {formatArea(sum.floor)} {open ? '▾' : '▸'}
+        </span>
+      </button>
+      {open && (
+        <div className="px-3 pb-3">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-muted text-left">
+                <th className="py-1 font-normal">{t('rooms.name')}</th>
+                <th className="py-1 font-normal text-right">{t('rooms.floorArea')}</th>
+                <th className="py-1 font-normal text-right">{t('rooms.wallArea')}</th>
+                <th className="py-1 font-normal text-right">{t('rooms.perimeter')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {derived.map(({ r, d }) => (
+                <tr key={r.id} className="border-t border-line">
+                  <td className="py-1">{r.name}</td>
+                  <td className="py-1 text-right">{formatArea(d.floorAreaM2)}</td>
+                  <td className="py-1 text-right">{formatArea(d.netWallAreaM2)}</td>
+                  <td className="py-1 text-right">{formatLength(d.perimeterM)}</td>
+                </tr>
+              ))}
+              <tr className="border-t border-gold/40 text-gold">
+                <td className="py-1">{t('rooms.listTotal')}</td>
+                <td className="py-1 text-right" data-testid="room-list-sum">{formatArea(sum.floor)}</td>
+                <td className="py-1 text-right">{formatArea(sum.wall)}</td>
+                <td className="py-1 text-right">{formatLength(sum.per)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

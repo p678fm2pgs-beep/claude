@@ -155,6 +155,12 @@ export const de: Record<string, string> = {
   'editor.deleteWallTitle': 'Wand löschen?',
   'editor.deleteWallBody':
     'Die Wand verschmilzt mit der Folgewand. Enthaltene Öffnungen: {n} — sie werden mit gelöscht. Flächen und Kalkulation aktualisieren sich sofort.',
+  'editor.toolMeasure': 'Messen',
+  'editor.measureHint1': 'Punkt A klicken (rastet an Ecken/Öffnungen)',
+  'editor.measureHint2': 'Punkt B klicken — ⊕ an der Maßzahl behält die Messung im Plan',
+  'editor.clearMeasures': 'Messungen löschen',
+  'rooms.list': 'Raumliste',
+  'rooms.listTotal': 'Summe',
   'rooms.wall': 'Wand',
   'rooms.offset': 'Versatz',
   'rooms.sill': 'Brüstung',

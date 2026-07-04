@@ -149,6 +149,12 @@ export const en: Record<string, string> = {
   'editor.deleteWallTitle': 'Delete wall?',
   'editor.deleteWallBody':
     'The wall merges with the following wall. Openings on it: {n} — they will be deleted too. Areas and pricing update immediately.',
+  'editor.toolMeasure': 'Measure',
+  'editor.measureHint1': 'Click point A (snaps to corners/openings)',
+  'editor.measureHint2': 'Click point B — ⊕ on the label keeps the measurement in the plan',
+  'editor.clearMeasures': 'Clear measurements',
+  'rooms.list': 'Room list',
+  'rooms.listTotal': 'Total',
   'rooms.wall': 'Wall',
   'rooms.offset': 'Offset',
   'rooms.sill': 'Sill',

@@ -410,3 +410,47 @@ export function openingsOnWallPair(fp: Floorplan, wallIndex: number): number {
   const v = (wallIndex + 1) % fp.points.length;
   return fp.openings.filter((o) => o.wallIndex === wallIndex || o.wallIndex === v).length;
 }
+
+// ═══════════ Erweiterung 7 · W6: Raum-Etikett + Messwerkzeug ═══════════
+
+/** Flächenschwerpunkt eines Polygons (für das Raum-Etikett). */
+export function polygonCentroid(points: Point[]): Point {
+  let a = 0;
+  let cx = 0;
+  let cy = 0;
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    const q = points[(i + 1) % points.length];
+    const cross = p.x * q.y - q.x * p.y;
+    a += cross;
+    cx += (p.x + q.x) * cross;
+    cy += (p.y + q.y) * cross;
+  }
+  if (Math.abs(a) < 1e-6) {
+    const n = points.length || 1;
+    return {
+      x: points.reduce((s, p) => s + p.x, 0) / n,
+      y: points.reduce((s, p) => s + p.y, 0) / n,
+    };
+  }
+  return { x: cx / (3 * a), y: cy / (3 * a) };
+}
+
+/** Fangpunkt fürs Messwerkzeug: Ecken/Öffnungskanten/Innenwand-Enden, sonst frei. */
+export function snapMeasurePoint(fp: Floorplan, p: Point, snapDistCm = 12): Point {
+  let best: { pt: Point; d: number } | null = null;
+  const consider = (pt: Point) => {
+    const d = Math.hypot(pt.x - p.x, pt.y - p.y);
+    if (d <= snapDistCm && (!best || d < best.d)) best = { pt, d };
+  };
+  for (const c of fp.points) consider(c);
+  for (const o of fp.openings) {
+    consider(pointOnWall(fp.points, o.wallIndex, o.offsetCm));
+    consider(pointOnWall(fp.points, o.wallIndex, o.offsetCm + o.widthCm));
+  }
+  for (const w of fp.innerWalls ?? []) {
+    consider(w.a);
+    consider(w.b);
+  }
+  return best ? (best as { pt: Point; d: number }).pt : p;
+}

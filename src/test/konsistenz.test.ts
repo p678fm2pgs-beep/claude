@@ -298,3 +298,26 @@ describe('W5 — Wand löschen', () => {
     expect(r.variants[0].materials.every((m) => m.wallIndex === undefined)).toBe(true);
   });
 });
+
+// ═══════════ Erweiterung 7 · W6: Raum-Etikett + Messwerkzeug ═══════════
+import { polygonCentroid, snapMeasurePoint } from '../lib/planEditor';
+
+describe('W6 — Raum-Etikett + Messwerkzeug', () => {
+  it('polygonCentroid: Rechteck-Mitte exakt', () => {
+    const c = polygonCentroid(plan().points);
+    expect(c.x).toBeCloseTo(250, 5);
+    expect(c.y).toBeCloseTo(200, 5);
+  });
+
+  it('snapMeasurePoint: rastet an Ecke und Öffnungskante, sonst frei', () => {
+    const fp = plan();
+    expect(snapMeasurePoint(fp, { x: 6, y: 8 })).toEqual({ x: 0, y: 0 }); // Ecke
+    expect(snapMeasurePoint(fp, { x: 104, y: 5 })).toEqual({ x: 100, y: 0 }); // Türkante (offset 100)
+    expect(snapMeasurePoint(fp, { x: 250, y: 123 })).toEqual({ x: 250, y: 123 }); // frei diagonal
+  });
+
+  it('behaltene Messungen verändern keinerlei Flächen (nur Anzeige/PDF)', () => {
+    const withM = plan({ measurements: [{ id: 'm1', a: { x: 0, y: 0 }, b: { x: 500, y: 400 } }] });
+    expect(deriveAreas(withM, 270)).toEqual(deriveAreas(plan(), 270));
+  });
+});
