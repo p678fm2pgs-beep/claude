@@ -23,6 +23,9 @@ import {
   exactLengthPoint,
   pointOnBoundary,
   splitPolygon,
+  splitWallAt,
+  deleteWall,
+  openingsOnWallPair,
 } from '../lib/planEditor';
 import { useT } from '../hooks';
 import { uid } from '../lib/id';
@@ -50,7 +53,7 @@ export function PlanEditor({
   onSplitRoom,
 }: {
   room: Room;
-  commit: (fn: (fp: Floorplan) => void) => void;
+  commit: (fn: (fp: Floorplan, setHeight: (h: number) => void, room: Room) => void) => void;
   width?: number;
   height?: number;
   /** W4: Raum durch die neue Wand in zwei Räume teilen (Projekt-Ebene). */
@@ -76,6 +79,9 @@ export function PlanEditor({
   const [splitAsk, setSplitAsk] = useState<InnerWall | null>(null);
   /** Ausgewählte Wand: Umriss-Index ODER Innenwand-ID. */
   const [selWall, setSelWall] = useState<number | string | null>(null);
+  // ── W5: Wand teilen / löschen ──
+  const [splittingWall, setSplittingWall] = useState<number | null>(null);
+  const [deleteAsk, setDeleteAsk] = useState<number | null>(null);
 
   if (pts.length < 3) return null;
 
@@ -240,6 +246,8 @@ export function PlanEditor({
       setSelectedId(null);
       setEditing(null);
       setSelWall(null);
+      setSplittingWall(null);
+      setDeleteAsk(null);
       return;
     }
     // W4: exakte Längeneingabe während des Ziehens (Ziffern + Enter)
@@ -334,12 +342,29 @@ export function PlanEditor({
                     opacity={isSel ? 0.9 : 0.8}
                   />
                 )}
+                {splittingWall === i && (
+                  <line
+                    x1={tx(p.x)} y1={ty(p.y)} x2={tx(b.x)} y2={ty(b.y)}
+                    stroke="#C9A84C" strokeWidth={4} strokeDasharray="3 3" opacity={0.7}
+                  />
+                )}
                 <line
                   x1={tx(p.x)} y1={ty(p.y)} x2={tx(b.x)} y2={ty(b.y)}
                   stroke="transparent" strokeWidth={12}
-                  style={{ cursor: 'pointer' }}
+                  style={{ cursor: splittingWall === i ? 'crosshair' : 'pointer' }}
                   onPointerDown={(e) => {
                     e.stopPropagation();
+                    // W5: Teilen-Modus — Klickpunkt teilt die Wand in zwei Segmente.
+                    if (splittingWall === i) {
+                      const { s } = projectOntoWall(pts, i, toWorld(e));
+                      const at = Math.round(s / 10) * 10;
+                      commit((_fp, _h, r) => {
+                        splitWallAt(r, i, at);
+                      });
+                      setSplittingWall(null);
+                      setSelWall(null);
+                      return;
+                    }
                     setSelWall(i);
                     setSelectedId(null);
                   }}
@@ -549,15 +574,65 @@ export function PlanEditor({
       </div>
 
       {/* Wand-Eigenschaften (W4) */}
-      {selWall !== null && tool === 'select' && (
+      {selWall !== null && tool === 'select' && splittingWall === null && (
         <WallPropsPanel
           plan={plan}
           selWall={selWall}
           heightCm={room.heightCm}
           commit={commit}
           onClose={() => setSelWall(null)}
+          onStartSplit={(i) => {
+            setSplittingWall(i);
+          }}
+          onDeleteWall={(i) => setDeleteAsk(i)}
           t={t}
         />
+      )}
+
+      {/* W5: Hinweis im Teilen-Modus */}
+      {splittingWall !== null && (
+        <div className="absolute bottom-1 left-1 text-[11px] text-gold bg-surface/90 border border-line rounded px-2 py-1" data-testid="split-mode-hint">
+          {t('editor.splitWallHint')}
+          <button className="ml-2 text-muted hover:text-text" onClick={() => setSplittingWall(null)} aria-label={t('common.cancel')}>
+            <X size={10} />
+          </button>
+        </div>
+      )}
+
+      {/* W5: Wand-löschen-Dialog */}
+      {deleteAsk !== null && (
+        <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded" data-testid="wall-delete-dialog">
+          <div className="card p-4 max-w-xs text-center">
+            <p className="text-sm mb-1">{t('editor.deleteWallTitle')}</p>
+            <p className="text-muted text-xs mb-2">
+              {t('editor.deleteWallBody', { n: openingsOnWallPair(plan, deleteAsk) })}
+            </p>
+            {plan.wallProps?.[deleteAsk]?.loadbearing && (
+              <p className="text-danger text-xs mb-2" data-testid="loadbearing-warning">
+                {t('editor.deleteLoadbearing')}
+              </p>
+            )}
+            <div className="flex gap-2 justify-center mt-3">
+              <button className="btn btn-ghost text-xs py-1.5" onClick={() => setDeleteAsk(null)} data-testid="wall-delete-cancel">
+                {t('common.cancel')}
+              </button>
+              <button
+                className="btn btn-danger text-xs py-1.5"
+                onClick={() => {
+                  const idx = deleteAsk;
+                  commit((_fp, _h, r) => {
+                    deleteWall(r, idx);
+                  });
+                  setDeleteAsk(null);
+                  setSelWall(null);
+                }}
+                data-testid="wall-delete-confirm"
+              >
+                {t('common.delete')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Raum teilen? (W4) */}
@@ -652,13 +727,17 @@ export function PlanEditor({
 
 /** Eigenschaften-Panel für Umriss- und Innenwände (W4). */
 function WallPropsPanel({
-  plan, selWall, heightCm, commit, onClose, t,
+  plan, selWall, heightCm, commit, onClose, onStartSplit, onDeleteWall, t,
 }: {
   plan: Floorplan;
   selWall: number | string;
   heightCm: number;
   commit: (fn: (fp: Floorplan) => void) => void;
   onClose: () => void;
+  /** W5: Teilen-Modus für Umriss-Wände starten. */
+  onStartSplit: (wallIndex: number) => void;
+  /** W5: Umriss-Wand löschen (mit Dialog). */
+  onDeleteWall: (wallIndex: number) => void;
   t: (k: string, p?: Record<string, string | number>) => string;
 }) {
   const isInner = typeof selWall === 'string';
@@ -754,9 +833,29 @@ function WallPropsPanel({
         {t('editor.loadbearing')}
       </label>
       {!isInner && (
-        <p className="text-[9px] text-muted">
-          {t('editor.wallArea')}: {(wallLengthCm(plan.points, selWall as number) / CM_PER_M * (heightCm / CM_PER_M)).toFixed(2)} m²
-        </p>
+        <>
+          <p className="text-[9px] text-muted">
+            {t('editor.wallArea')}: {(wallLengthCm(plan.points, selWall as number) / CM_PER_M * (heightCm / CM_PER_M)).toFixed(2)} m²
+          </p>
+          {/* W5: Teilen + Löschen */}
+          <div className="flex gap-1.5">
+            <button
+              className="btn btn-ghost flex-1 text-[11px] py-1"
+              onClick={() => onStartSplit(selWall as number)}
+              data-testid="wall-split"
+            >
+              {t('editor.splitWall')}
+            </button>
+            <button
+              className="btn btn-danger flex-1 text-[11px] py-1"
+              onClick={() => onDeleteWall(selWall as number)}
+              disabled={plan.points.length <= 3}
+              data-testid="wall-delete-outer"
+            >
+              {t('common.delete')}
+            </button>
+          </div>
+        </>
       )}
       {isInner && (
         <button className="btn btn-danger w-full text-[11px] py-1" onClick={removeInner} data-testid="wall-delete">

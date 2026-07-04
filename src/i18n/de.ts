@@ -150,6 +150,11 @@ export const de: Record<string, string> = {
   'editor.loadbearing': 'tragend',
   'editor.deleteLoadbearing': 'Achtung: Diese Wand ist als TRAGEND markiert. Wirklich löschen?',
   'editor.wallArea': 'Wandfläche brutto',
+  'editor.splitWall': 'Teilen',
+  'editor.splitWallHint': 'Klickpunkt auf der markierten Wand teilt sie in zwei Segmente. Esc bricht ab.',
+  'editor.deleteWallTitle': 'Wand löschen?',
+  'editor.deleteWallBody':
+    'Die Wand verschmilzt mit der Folgewand. Enthaltene Öffnungen: {n} — sie werden mit gelöscht. Flächen und Kalkulation aktualisieren sich sofort.',
   'rooms.wall': 'Wand',
   'rooms.offset': 'Versatz',
   'rooms.sill': 'Brüstung',

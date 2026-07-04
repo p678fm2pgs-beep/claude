@@ -29,6 +29,8 @@ const ROOM_TYPES: RoomType[] = [
 interface Snapshot {
   floorplan: Floorplan;
   heightCm: number;
+  /** (Erweiterung 7 · W5) Varianten mitsichern — Wand-Remaps sauber rückgängig. */
+  variants: Room['variants'];
 }
 
 export function RoomsModule({
@@ -54,9 +56,15 @@ export function RoomsModule({
   const [, forceTick] = useState(0);
 
   const snapshot = (): Snapshot | undefined =>
-    room ? { floorplan: JSON.parse(JSON.stringify(room.floorplan)), heightCm: room.heightCm } : undefined;
+    room
+      ? {
+          floorplan: JSON.parse(JSON.stringify(room.floorplan)),
+          heightCm: room.heightCm,
+          variants: JSON.parse(JSON.stringify(room.variants)),
+        }
+      : undefined;
 
-  const commit = (fn: (fp: Floorplan, setHeight: (h: number) => void) => void) => {
+  const commit = (fn: (fp: Floorplan, setHeight: (h: number) => void, room: Room) => void) => {
     const snap = snapshot();
     if (snap) {
       history.current.push(snap);
@@ -66,7 +74,7 @@ export function RoomsModule({
     updateProject((p) => {
       const r = p.rooms.find((x) => x.id === activeRoomId);
       if (!r) return;
-      fn(r.floorplan, (h) => (r.heightCm = h));
+      fn(r.floorplan, (h) => (r.heightCm = h), r);
     });
     forceTick((n) => n + 1);
   };
@@ -80,6 +88,7 @@ export function RoomsModule({
       if (!r) return;
       r.floorplan = snap.floorplan;
       r.heightCm = snap.heightCm;
+      r.variants = snap.variants;
     });
     forceTick((n) => n + 1);
   };
@@ -92,6 +101,7 @@ export function RoomsModule({
       if (!r) return;
       r.floorplan = snap.floorplan;
       r.heightCm = snap.heightCm;
+      r.variants = snap.variants;
     });
     forceTick((n) => n + 1);
   };
@@ -205,7 +215,7 @@ function RoomEditor({
   canRedo,
 }: {
   roomId: string;
-  commit: (fn: (fp: Floorplan, setHeight: (h: number) => void) => void) => void;
+  commit: (fn: (fp: Floorplan, setHeight: (h: number) => void, room: Room) => void) => void;
   undo: () => void;
   redo: () => void;
   canUndo: boolean;
@@ -501,7 +511,7 @@ function OpeningRow({
 }: {
   roomId: string;
   openingId: string;
-  commit: (fn: (fp: Floorplan, setHeight: (h: number) => void) => void) => void;
+  commit: (fn: (fp: Floorplan, setHeight: (h: number) => void, room: Room) => void) => void;
   wallCount: number;
 }) {
   const t = useT();

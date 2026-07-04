@@ -191,3 +191,110 @@ describe('W4 — Raumteilung', () => {
     expect(pointOnBoundary(pts, { x: 250, y: 200 })).toBeNull();
   });
 });
+
+// ═══════════ Erweiterung 7 · W5: Wand teilen / löschen ═══════════
+import { splitWallAt, deleteWall, remapWallRefs, openingsOnWallPair } from '../lib/planEditor';
+
+function roomForW5(): Room {
+  const r = roomWith(plan());
+  r.floorplan.openings.push({
+    id: 'fenster1', kind: 'fenster', wallIndex: 2, offsetCm: 150, widthCm: 120, heightCm: 140, sillCm: 90,
+  });
+  r.floorplan.wallProps = { 0: { loadbearing: true, thicknessCm: 24 }, 2: { wallType: 'trockenbau' } };
+  r.variants[0].wallColors = { 0: 'weiss-1', 2: 'gruen-2' };
+  r.variants[0].materials.push({ id: 'm3', materialId: 'kalkfarbe', surface: 'wand', tier: 'standard', wallIndex: 2 });
+  return r;
+}
+
+describe('W5 — Wand teilen', () => {
+  it('teilt Wand 0 bei 250: Punkt eingefügt, Öffnung bleibt auf ihrem Segment', () => {
+    const r = roomForW5();
+    expect(splitWallAt(r, 0, 250)).toBe(true);
+    expect(r.floorplan.points.length).toBe(5);
+    // Tür (100..190) bleibt auf Segment 0 mit unverändertem Offset:
+    const tuer = r.floorplan.openings.find((o) => o.id === 'tuer1')!;
+    expect(tuer.wallIndex).toBe(0);
+    expect(tuer.offsetCm).toBe(100);
+    // Fenster war auf Wand 2 → jetzt Wand 3:
+    const fenster = r.floorplan.openings.find((o) => o.id === 'fenster1')!;
+    expect(fenster.wallIndex).toBe(3);
+    expect(fenster.offsetCm).toBe(150);
+  });
+
+  it('Öffnung rechts vom Teilungspunkt wandert aufs zweite Segment (Offset umgerechnet)', () => {
+    const r = roomForW5();
+    splitWallAt(r, 0, 80);
+    const tuer = r.floorplan.openings.find((o) => o.id === 'tuer1')!;
+    expect(tuer.wallIndex).toBe(1);
+    expect(tuer.offsetCm).toBe(20); // 100 − 80
+  });
+
+  it('Referenzen (wallColors, wallProps, Material.wallIndex) werden konsistent verschoben + geerbt', () => {
+    const r = roomForW5();
+    splitWallAt(r, 0, 250);
+    expect(r.floorplan.wallProps?.[0]?.loadbearing).toBe(true);
+    expect(r.floorplan.wallProps?.[1]?.loadbearing).toBe(true); // zweites Segment erbt
+    expect(r.floorplan.wallProps?.[3]?.wallType).toBe('trockenbau'); // alt 2 → 3
+    expect(r.variants[0].wallColors?.[3]).toBe('gruen-2');
+    expect(r.variants[0].materials.find((m) => m.id === 'm3')?.wallIndex).toBe(3);
+  });
+
+  it('randnaher Klickpunkt → keine Teilung', () => {
+    const r = roomForW5();
+    expect(splitWallAt(r, 0, 2)).toBe(false);
+    expect(r.floorplan.points.length).toBe(4);
+  });
+
+  it('Flächen bleiben bei reiner Teilung identisch (Konsistenz)', () => {
+    const r = roomForW5();
+    const before = deriveAreas(r.floorplan, r.heightCm);
+    splitWallAt(r, 0, 250);
+    const after = deriveAreas(r.floorplan, r.heightCm);
+    expect(after.floorAreaM2).toBe(before.floorAreaM2);
+    expect(after.netWallAreaM2).toBe(before.netWallAreaM2);
+  });
+});
+
+describe('W5 — Wand löschen', () => {
+  it('zählt vorher die betroffenen Öffnungen (Dialog)', () => {
+    const r = roomForW5();
+    expect(openingsOnWallPair(r.floorplan, 0)).toBe(1); // Tür auf Wand 0
+    expect(openingsOnWallPair(r.floorplan, 1)).toBe(1); // Fenster auf Folgewand 2
+  });
+
+  it('löscht Wand 0: Eckpunkt weg, Tür entfernt, Fenster-Referenzen verschoben', () => {
+    const r = roomForW5();
+    const res = deleteWall(r, 0)!;
+    expect(res.removedOpenings).toBe(1);
+    expect(r.floorplan.points.length).toBe(3);
+    const fenster = r.floorplan.openings.find((o) => o.id === 'fenster1')!;
+    expect(fenster.wallIndex).toBe(1); // alt 2 → 1
+    expect(r.variants[0].wallColors?.[1]).toBe('gruen-2');
+    expect(r.variants[0].materials.find((m) => m.id === 'm3')?.wallIndex).toBe(1);
+  });
+
+  it('Umlauf-Fall: letzte Wand löschen (Eckpunkt 0 entfällt) bleibt konsistent', () => {
+    const r = roomForW5();
+    const res = deleteWall(r, 3)!; // Wand 3 = (0,400)→(0,0), Eckpunkt 0 entfällt
+    expect(res).not.toBeNull();
+    expect(r.floorplan.points.length).toBe(3);
+    for (const o of r.floorplan.openings) {
+      expect(o.wallIndex).toBeLessThan(3);
+      expect(o.wallIndex).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('Dreieck: Löschen verweigert (null)', () => {
+    const r = roomForW5();
+    deleteWall(r, 0);
+    expect(deleteWall(r, 0)).toBeNull();
+  });
+
+  it('remapWallRefs: null entfernt Verweise vollständig', () => {
+    const r = roomForW5();
+    remapWallRefs(r, () => null);
+    expect(Object.keys(r.floorplan.wallProps ?? {}).length).toBe(0);
+    expect(Object.keys(r.variants[0].wallColors ?? {}).length).toBe(0);
+    expect(r.variants[0].materials.every((m) => m.wallIndex === undefined)).toBe(true);
+  });
+});

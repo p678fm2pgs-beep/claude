@@ -298,3 +298,115 @@ export function reassignOpenings(
     return best;
   }
 }
+
+// ═══════════ Erweiterung 7 · W5: Wand teilen / löschen (zentraler Remapper) ═══════════
+import type { Room, WallProps } from '../types';
+
+/**
+ * EIN zentraler Remapper für ALLE wandgebundenen Verweise eines Raums
+ * (wallProps, wallColors, MaterialSelection.wallIndex, LightSelection.wallIndices).
+ * map(alt) → neu oder null (Verweis entfällt). Verhindert stille Inkonsistenzen.
+ */
+export function remapWallRefs(room: Room, map: (i: number) => number | null): void {
+  const fp = room.floorplan;
+  if (fp.wallProps) {
+    const next: Record<number, WallProps> = {};
+    for (const [k, v] of Object.entries(fp.wallProps)) {
+      const m = map(Number(k));
+      if (m !== null) next[m] = v;
+    }
+    fp.wallProps = next;
+  }
+  for (const v of room.variants) {
+    if (v.wallColors) {
+      const next: Record<number, string> = {};
+      for (const [k, c] of Object.entries(v.wallColors)) {
+        const m = map(Number(k));
+        if (m !== null) next[m] = c;
+      }
+      v.wallColors = next;
+    }
+    for (const sel of v.materials) {
+      if (sel.wallIndex !== undefined) {
+        const m = map(sel.wallIndex);
+        if (m === null) delete sel.wallIndex;
+        else sel.wallIndex = m;
+      }
+    }
+    for (const l of v.lights ?? []) {
+      if (l.wallIndices) {
+        l.wallIndices = l.wallIndices
+          .map((i) => map(i))
+          .filter((x): x is number => x !== null);
+      }
+    }
+  }
+}
+
+/**
+ * Teilt Umriss-Wand wallIndex am Punkt atCm in zwei Segmente.
+ * Öffnungen bleiben auf ihrem Segment (Offset umgerechnet), Eigenschaften/Farben
+ * der Wand gelten für beide Segmente weiter. false bei zu randnahem Klickpunkt.
+ */
+export function splitWallAt(room: Room, wallIndex: number, atCm: number): boolean {
+  const fp = room.floorplan;
+  const len = wallLengthCm(fp.points, wallIndex);
+  if (atCm < 5 || atCm > len - 5) return false;
+  const p = pointOnWall(fp.points, wallIndex, atCm);
+  fp.points = [...fp.points.slice(0, wallIndex + 1), p, ...fp.points.slice(wallIndex + 1)];
+  for (const o of fp.openings) {
+    if (o.wallIndex > wallIndex) o.wallIndex += 1;
+    else if (o.wallIndex === wallIndex) {
+      const mid = o.offsetCm + o.widthCm / 2;
+      if (mid > atCm) {
+        o.wallIndex += 1;
+        o.offsetCm = Math.max(0, o.offsetCm - atCm);
+      }
+      const segLen = wallLengthCm(fp.points, o.wallIndex);
+      o.offsetCm = Math.max(0, Math.min(Math.max(0, segLen - o.widthCm), o.offsetCm));
+    }
+  }
+  remapWallRefs(room, (i) => (i > wallIndex ? i + 1 : i));
+  // Zweites Segment erbt Eigenschaften/Farbe des ersten:
+  const props = fp.wallProps?.[wallIndex];
+  if (props) fp.wallProps = { ...fp.wallProps, [wallIndex + 1]: { ...props } };
+  for (const v of room.variants) {
+    const c = v.wallColors?.[wallIndex];
+    if (c) v.wallColors = { ...v.wallColors, [wallIndex + 1]: c };
+  }
+  return true;
+}
+
+/**
+ * Löscht Umriss-Wand wallIndex: Eckpunkt wallIndex+1 entfällt, die Wand
+ * verschmilzt mit der Folgewand. Öffnungen auf beiden betroffenen Wänden werden
+ * entfernt (Anzahl im Ergebnis — für den Bestätigungsdialog VORHER zählen).
+ * null bei Dreieck (Minimum) — dann ist Löschen nicht möglich.
+ */
+export function deleteWall(room: Room, wallIndex: number): { removedOpenings: number } | null {
+  const fp = room.floorplan;
+  const n = fp.points.length;
+  if (n <= 3) return null;
+  const v = (wallIndex + 1) % n;
+  const mergedNew = v === 0 ? n - 2 : v - 1;
+  const before = fp.openings.length;
+  fp.openings = fp.openings.filter((o) => o.wallIndex !== wallIndex && o.wallIndex !== v);
+  const removedOpenings = before - fp.openings.length;
+  fp.points = fp.points.filter((_, idx) => idx !== v);
+  const map = (k: number): number | null => {
+    if (k === wallIndex || k === v) return mergedNew;
+    return k > v ? k - 1 : k;
+  };
+  for (const o of fp.openings) {
+    const m = map(o.wallIndex);
+    if (m !== null) o.wallIndex = m;
+  }
+  remapWallRefs(room, map);
+  return { removedOpenings };
+}
+
+/** Anzahl Öffnungen, die ein Wand-Löschen entfernen würde (für den Dialog). */
+export function openingsOnWallPair(fp: Floorplan, wallIndex: number): number {
+  const v = (wallIndex + 1) % fp.points.length;
+  return fp.openings.filter((o) => o.wallIndex === wallIndex || o.wallIndex === v).length;
+}

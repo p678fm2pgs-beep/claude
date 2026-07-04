@@ -144,6 +144,11 @@ export const en: Record<string, string> = {
   'editor.loadbearing': 'load-bearing',
   'editor.deleteLoadbearing': 'Warning: this wall is marked LOAD-BEARING. Delete anyway?',
   'editor.wallArea': 'Gross wall area',
+  'editor.splitWall': 'Split',
+  'editor.splitWallHint': 'Click a point on the highlighted wall to split it into two segments. Esc cancels.',
+  'editor.deleteWallTitle': 'Delete wall?',
+  'editor.deleteWallBody':
+    'The wall merges with the following wall. Openings on it: {n} — they will be deleted too. Areas and pricing update immediately.',
   'rooms.wall': 'Wall',
   'rooms.offset': 'Offset',
   'rooms.sill': 'Sill',
