@@ -3,6 +3,7 @@ import { useStore } from '../../store/useStore';
 import { useT } from '../../hooks';
 import { PageHeader, EmptyState, Field, Badge } from '../../components/ui';
 import { MiniPlan } from '../../components/MiniPlan';
+import { PlanEditor } from '../../components/PlanEditor';
 import { getRoom, getActiveVariant } from '../roomHelpers';
 import { RealisticPlan } from '../../components/RealisticPlan';
 // three.js wird erst geladen, wenn die 3D-Ansicht geöffnet wird (Code-Splitting).
@@ -356,7 +357,8 @@ function RoomEditor({
           ) : planView === 'realistisch' && variant ? (
             <RealisticPlan room={room} variant={variant} width={560} height={360} showDimensions />
           ) : (
-            <MiniPlan plan={room.floorplan} heightCm={room.heightCm} width={560} height={360} showDimensions />
+            /* Erweiterung 7 · W2: interaktiver Editor (Ziehen entlang der Wand, Live-Maße) */
+            <PlanEditor room={room} commit={commit} width={560} height={360} />
           )}
           <div className="flex items-center gap-2 mt-2 text-[#6b6256] text-xs">
             {planView === 'dreidimensional' ? (
