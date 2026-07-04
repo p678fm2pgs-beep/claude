@@ -20,7 +20,7 @@ const BASELINE = {
   tones: 120,
   families: 12,
   materials: 63,
-  furniture: 18,
+  furniture: 18, // Baseline VOR Erw. 4 (nur ≥) — Erw. 8 wuchs auf 56 (siehe furniturePlus)
   trades: 18,
   addons: 25,
   presets: 5,

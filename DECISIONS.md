@@ -46,3 +46,20 @@
 - Undo-Snapshots enthalten seit W5 auch die Varianten (Remap-Operationen sauber rückgängig);
   Raumteilung selbst ist bewusst NICHT im Editor-Undo (Projekt-Ebene) — Rückweg: Raum löschen.
 - Onboarding/Kürzel als überspringbares Overlay statt Tour-Framework (offline, 0 Abhängigkeiten).
+
+## Erweiterung 8 — „Termin-, Einrichtungs- & Abschluss-Ausbau" (T0–T11)
+- Alle neuen Felder optional (PlacedObject/ElectroItem/HeatZone/PlanPin/Approval/
+  InspirationImage, Room.photos/pins, Project.approvals/inspiration/dismissedHints) →
+  Altprojekte ohne Migration gültig; Kosten bitgleich (Test).
+- Katalog wächst nur (furniturePlus, +38 Typen); Bestandstypen erhalten NUR optionale
+  Platzierungs-Metadaten, Preise/IDs unverändert.
+- Platzierte Einrichtung = eigene Kostenpositionen (Maß im Namen, lfm × Breite);
+  Bestandsmöbel (bestand=true) zählen NIE. Die bestehende Möbel-Liste bleibt daneben
+  bestehen — zwei bewusst getrennte, sichtbare Wege statt Zusammenlegung.
+- Laufwege-Check + T1-Warnfärbung teilen dieselbe Schwelle (CLEARANCE_WARN_CM = 60);
+  Hinweise nie Blockade, projektweise ignorierbar über stabile Schlüssel.
+- Interne Ebenen (Pins/Hinweise/Inspiration) strikt an Expertenmodus gebunden;
+  Präsentationsmodus zeigt Hinweise nie, Beratungsmodus standardmäßig aus.
+- Elektro ohne Preisposition → ehrliche 0-Preise (reine Mengenliste), keine erfundenen Preise.
+- Treppen als Platzhalter mit echtem Platzbedarf + Fachbetrieb-Hinweis; Mehrgeschoss = Roadmap.
+- Bilder als komprimierte DataURLs (Canvas, offline); Signatur als PNG mit Zeitstempel.

@@ -1735,11 +1735,12 @@ export function PlanEditor({
               <li><span className="text-text">{t('editor.help2')}</span></li>
               <li><span className="text-text">{t('editor.help3')}</span></li>
               <li><span className="text-text">{t('editor.help4')}</span></li>
+              <li><span className="text-text">{t('editor.help5')}</span></li>
               <li className="pt-1 border-t border-line">
-                <kbd className="text-gold">W</kbd> {t('editor.toolWall')} · <kbd className="text-gold">M</kbd> {t('editor.toolMeasure')} ·{' '}
-                <kbd className="text-gold">D</kbd> {t('editor.duplicate')} · <kbd className="text-gold">Entf</kbd> {t('common.delete')} ·{' '}
-                <kbd className="text-gold">Esc</kbd> {t('common.cancel')} · <kbd className="text-gold">Alt</kbd> {t('editor.helpFine')} ·{' '}
-                <kbd className="text-gold">Shift</kbd> {t('editor.helpFreeAngle')}
+                <kbd className="text-gold">E</kbd> {t('objects.tool')} · <kbd className="text-gold">W</kbd> {t('editor.toolWall')} ·{' '}
+                <kbd className="text-gold">M</kbd> {t('editor.toolMeasure')} · <kbd className="text-gold">D</kbd> {t('editor.duplicate')} ·{' '}
+                <kbd className="text-gold">Entf</kbd> {t('common.delete')} · <kbd className="text-gold">Esc</kbd> {t('common.cancel')} ·{' '}
+                <kbd className="text-gold">Alt</kbd> {t('editor.helpFine')} · <kbd className="text-gold">Shift</kbd> {t('editor.helpFreeAngle')}
               </li>
             </ul>
             <button className="btn btn-primary w-full mt-4 text-xs py-1.5" onClick={dismissHelp} data-testid="onboarding-dismiss">

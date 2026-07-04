@@ -180,6 +180,7 @@ export const de: Record<string, string> = {
   'editor.help4': 'Messen: Punkt A und B klicken; ⊕ behält die Messung (erscheint im Aufmaß-PDF). Nordpfeil oben rechts drehen; # Raster, ⊾ Lineale.',
   'editor.helpFine': 'fein (1 cm)',
   'editor.helpFreeAngle': 'freier Winkel',
+  'editor.help5': 'Einrichten (E): Objekt aus dem Katalog platzieren, an Griffen skalieren oder Maße eintippen; Abstände zu Wänden/Nachbarn laufen mit (rot unter 60 cm). Elektro, FBH-Zone und Pins über die Werkzeugleiste; Ebenen einzeln schaltbar.',
   'editor.helpOk': 'Verstanden',
   'objects.tool': 'Einrichten',
   'objects.palette': 'Einrichtung wählen',

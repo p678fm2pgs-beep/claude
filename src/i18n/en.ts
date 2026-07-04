@@ -174,6 +174,7 @@ export const en: Record<string, string> = {
   'editor.help4': 'Measure: click points A and B; ⊕ keeps the measurement (appears in the site-plan PDF). Rotate the north arrow top right; # grid, ⊾ rulers.',
   'editor.helpFine': 'fine (1 cm)',
   'editor.helpFreeAngle': 'free angle',
+  'editor.help5': 'Furnish (E): place an object from the catalogue, scale by handles or type dimensions; distances to walls/neighbours follow live (red under 60 cm). Electrical, UFH zone and pins via the toolbar; layers toggle individually.',
   'editor.helpOk': 'Got it',
   'objects.tool': 'Furnish',
   'objects.palette': 'Choose furnishing',

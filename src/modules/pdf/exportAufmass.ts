@@ -9,7 +9,8 @@ import { jsPDF } from 'jspdf';
 import type { Project, Room, Lang } from '../../types';
 import { CM_PER_M, wallLengthCm, deriveAreas } from '../../lib/geometry';
 import { openingSymbol, inwardNormal } from '../../lib/planSymbols';
-import { polygonCentroid, cornerDistances } from '../../lib/planEditor';
+import { polygonCentroid, cornerDistances, pointOnWall } from '../../lib/planEditor';
+import { electroSymbol } from '../../lib/electroSymbols';
 import { translate } from '../../i18n';
 
 const INK = '#1A1814';
@@ -161,6 +162,44 @@ function drawRoomPage(
   doc.setDrawColor('#5C544A');
   for (const iw of fp.innerWalls ?? []) {
     doc.line(X(iw.a.x), Y(iw.a.y), X(iw.b.x), Y(iw.b.y));
+  }
+
+  // (Erweiterung 8) FBH-Zonen + Elektro-Symbole (Planungsdaten, ohne Preise)
+  const variant = room.variants.find((v) => v.id === room.activeVariantId);
+  doc.setLineWidth(0.2);
+  for (const z of variant?.heatZones ?? []) {
+    doc.setDrawColor('#C16E4F');
+    doc.setLineDashPattern([1.5, 1], 0);
+    for (let i = 0; i < z.poly.length; i++) {
+      const a = z.poly[i];
+      const b = z.poly[(i + 1) % z.poly.length];
+      doc.line(X(a.x), Y(a.y), X(b.x), Y(b.y));
+    }
+    doc.setLineDashPattern([], 0);
+  }
+  doc.setDrawColor('#5A6B5A');
+  doc.setLineWidth(0.25);
+  for (const el of variant?.electro ?? []) {
+    let ex: number;
+    let ey: number;
+    let angle = 0;
+    if (el.wallIndex !== undefined && el.offsetCm !== undefined) {
+      const pp = pointOnWall(pts, el.wallIndex, el.offsetCm);
+      const inw = inwardNormal(pts, el.wallIndex);
+      ex = pp.x + inw.x * 11;
+      ey = pp.y + inw.y * 11;
+      const a = pts[el.wallIndex];
+      const b = pts[(el.wallIndex + 1) % pts.length];
+      angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+    } else {
+      ex = el.x ?? 0;
+      ey = el.y ?? 0;
+    }
+    for (const line of electroSymbol(el.kind, ex, ey, angle)) {
+      for (let i = 0; i < line.pts.length - 1; i++) {
+        doc.line(X(line.pts[i].x), Y(line.pts[i].y), X(line.pts[i + 1].x), Y(line.pts[i + 1].y));
+      }
+    }
   }
 
   // Öffnungen mit korrekten Symbolen (gleiche Quelle wie der Editor)
