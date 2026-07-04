@@ -18,6 +18,7 @@ import {
   offsetFromCorner,
   clampOpeningOffset,
   projectOntoWall,
+  pointOnWall,
   snapWallPoint,
   snapWallDirection,
   exactLengthPoint,
@@ -30,17 +31,25 @@ import {
   snapMeasurePoint,
 } from '../lib/planEditor';
 import { deriveAreas } from '../lib/geometry';
+import { useStore } from '../store/useStore';
 import { useT } from '../hooks';
 import { uid } from '../lib/id';
-import { Copy, X, MousePointer2, PenLine, Ruler, Armchair } from 'lucide-react';
+import { Copy, X, MousePointer2, PenLine, Ruler, Armchair, Zap, Flame, MapPin } from 'lucide-react';
 import { ObjectLayer, placeObjectAt } from './ObjectLayer';
 import { FURNITURE_TYPES, findFurnitureType } from '../data/furniture';
-import type { PlacedObject } from '../types';
+import { electroSymbol } from '../lib/electroSymbols';
+import { footprintAreaM2 } from '../lib/objects';
+import { compressImage } from '../lib/image';
+import { ELECTRO_LABELS } from '../lib/projectCost';
+import type { PlacedObject, ElectroItem, ElectroKind, PlanPin, PinCategory } from '../types';
 
 const PAD = 30;
 const WALL_THICKNESSES = [11.5, 17.5, 24, 36.5];
+const ELECTRO_KINDS: ElectroKind[] = ['steckdose1', 'steckdose2', 'steckdose3', 'schalter', 'wechsel', 'doppel', 'deckenauslass', 'wandauslass', 'netzwerk', 'tv', 'herd'];
+const PIN_CATEGORIES: PinCategory[] = ['hinweis', 'frage', 'mangel', 'todo'];
+const PIN_COLORS: Record<PinCategory, string> = { hinweis: '#C9A84C', frage: '#5A7488', mangel: '#C8553D', todo: '#6B8F71' };
 
-type Tool = 'select' | 'wall' | 'measure';
+type Tool = 'select' | 'wall' | 'measure' | 'electro' | 'heat' | 'pin';
 
 interface SessionMeasure {
   id: string;
@@ -72,6 +81,9 @@ export function PlanEditor({
   onSplitRoom?: (polyA: Point[], polyB: Point[], wall: InnerWall) => void;
 }) {
   const t = useT();
+  // Interne Ebenen (Pins) nur im Expertenmodus — Kunden-/Präsentationsmodus NIE.
+  const mode = useStore((s) => s.mode);
+  const internalAllowed = mode === 'experte';
   const plan = room.floorplan;
   const pts = plan.points;
   const svgRef = useRef<SVGSVGElement>(null);
@@ -114,6 +126,12 @@ export function PlanEditor({
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteQuery, setPaletteQuery] = useState('');
   const [polyDraw, setPolyDraw] = useState<Point[] | null>(null);
+  // ── Erweiterung 8 · T3/T4/T6: Elektro, Heizzonen, Pins ──
+  const [electroKind, setElectroKind] = useState<ElectroKind>('steckdose2');
+  const [heatDraw, setHeatDraw] = useState<Point[] | null>(null);
+  const [pinCat, setPinCat] = useState<PinCategory>('hinweis');
+  const [pinEdit, setPinEdit] = useState<string | null>(null);
+  const [layers, setLayers] = useState({ electro: true, heat: true, pins: true });
   // ── W8: Onboarding + Kürzel-Übersicht (einmalig, überspringbar) ──
   const [showHelp, setShowHelp] = useState<boolean>(() => {
     try {
@@ -328,6 +346,9 @@ export function PlanEditor({
       setPlacingTypeId(null);
       setPaletteOpen(false);
       setPolyDraw(null);
+      setHeatDraw(null);
+      setPinEdit(null);
+      if (tool !== 'select') setTool('select');
       return;
     }
     // W4: exakte Längeneingabe während des Ziehens (Ziffern + Enter)
@@ -431,6 +452,49 @@ export function PlanEditor({
             setPolyDraw([...polyDraw, toWorld(e)]);
             return;
           }
+          if (tool === 'heat') {
+            setHeatDraw([...(heatDraw ?? []), toWorld(e)]);
+            return;
+          }
+          if (tool === 'electro') {
+            // dockt an nächste Wand (Wand-Symbole) bzw. frei (Deckenauslass)
+            const p = toWorld(e);
+            const item: ElectroItem = { id: uid('el'), kind: electroKind };
+            if (electroKind === 'deckenauslass') {
+              item.x = Math.round(p.x);
+              item.y = Math.round(p.y);
+            } else {
+              let best: { i: number; s: number; dist: number } | null = null;
+              for (let i = 0; i < pts.length; i++) {
+                const { s, distCm } = projectOntoWall(pts, i, p);
+                const len = wallLengthCm(pts, i);
+                if (s < 0 || s > len) continue;
+                if (!best || distCm < best.dist) best = { i, s, dist: distCm };
+              }
+              if (best) {
+                item.wallIndex = best.i;
+                item.offsetCm = Math.round(best.s);
+              } else {
+                item.x = Math.round(p.x);
+                item.y = Math.round(p.y);
+              }
+            }
+            commit((_fp, _h, r) => {
+              const v = r.variants.find((x) => x.id === r.activeVariantId);
+              if (v) v.electro = [...(v.electro ?? []), item];
+            });
+            return;
+          }
+          if (tool === 'pin') {
+            const p = toWorld(e);
+            const pin: PlanPin = { id: uid('pin'), x: Math.round(p.x), y: Math.round(p.y), category: pinCat, text: '' };
+            commit((_fp, _h, r) => {
+              r.pins = [...(r.pins ?? []), pin];
+            });
+            setPinEdit(pin.id);
+            setTool('select');
+            return;
+          }
           if (tool === 'wall') {
             wallToolClick(e);
             return;
@@ -456,6 +520,17 @@ export function PlanEditor({
           if (tool === 'wall') {
             setWallStart(null);
             setLenBuf('');
+          }
+          // Heizzone schließen (≥3 Punkte)
+          if (heatDraw && heatDraw.length >= 3) {
+            const poly = heatDraw.map((p) => ({ x: Math.round(p.x), y: Math.round(p.y) }));
+            commit((_fp, _h, r) => {
+              const v = r.variants.find((x) => x.id === r.activeVariantId);
+              if (v) v.heatZones = [...(v.heatZones ?? []), { id: uid('hz'), poly }];
+            });
+            setHeatDraw(null);
+            setTool('select');
+            return;
           }
           // Sonderform schließen (≥3 Punkte)
           if (polyDraw && polyDraw.length >= 3) {
@@ -763,6 +838,51 @@ export function PlanEditor({
           );
         })}
 
+        {/* Erweiterung 8 · T4: FBH-Zonen (schraffiert, unter Möbeln) */}
+        {layers.heat && (() => {
+          const variant = room.variants.find((v) => v.id === room.activeVariantId);
+          return (variant?.heatZones ?? []).map((z) => {
+            const areaM2 = footprintAreaM2(z.poly);
+            const cx = z.poly.reduce((s, p) => s + p.x, 0) / z.poly.length;
+            const cy = z.poly.reduce((s, p) => s + p.y, 0) / z.poly.length;
+            return (
+              <g key={z.id} data-testid={`heat-zone-${z.id}`}>
+                <polygon
+                  points={z.poly.map((p) => `${tx(p.x)},${ty(p.y)}`).join(' ')}
+                  fill="rgba(193,110,79,0.12)"
+                  stroke="#C16E4F"
+                  strokeWidth={1}
+                  strokeDasharray="6 3"
+                  style={{ cursor: tool === 'select' ? 'pointer' : 'default' }}
+                  onPointerDown={(e) => {
+                    if (tool !== 'select') return;
+                    e.stopPropagation();
+                    if (window.confirm(t('heat.delete'))) {
+                      commit((_fp, _h, r) => {
+                        const v = r.variants.find((x) => x.id === r.activeVariantId);
+                        if (v) v.heatZones = (v.heatZones ?? []).filter((x) => x.id !== z.id);
+                      });
+                    }
+                  }}
+                />
+                <text x={tx(cx)} y={ty(cy)} fill="#C16E4F" fontSize={9} fontWeight={600} textAnchor="middle" pointerEvents="none">
+                  FBH {areaM2.toFixed(1).replace('.', ',')} m²
+                </text>
+              </g>
+            );
+          });
+        })()}
+        {tool === 'heat' && heatDraw && heatDraw.length > 0 && (
+          <polyline
+            points={[...heatDraw, ...(cursorPos ? [cursorPos] : [])].map((p) => `${tx(p.x)},${ty(p.y)}`).join(' ')}
+            fill="rgba(193,110,79,0.08)"
+            stroke="#C16E4F"
+            strokeWidth={1.5}
+            strokeDasharray="5 3"
+            data-testid="heat-draw"
+          />
+        )}
+
         {/* Erweiterung 8: Einrichtung (Teppiche unter Möbeln) */}
         {(() => {
           const variant = room.variants.find((v) => v.id === room.activeVariantId);
@@ -807,6 +927,72 @@ export function PlanEditor({
             ))}
           </g>
         )}
+
+        {/* Erweiterung 8 · T3: Elektro-Symbole */}
+        {layers.electro && (() => {
+          const variant = room.variants.find((v) => v.id === room.activeVariantId);
+          return (variant?.electro ?? []).map((el) => {
+            let px: number;
+            let py: number;
+            let angle = 0;
+            if (el.wallIndex !== undefined && el.offsetCm !== undefined) {
+              const p = pointOnWall(pts, el.wallIndex, el.offsetCm);
+              const inward = inwardNormal(pts, el.wallIndex);
+              px = p.x + inward.x * 11;
+              py = p.y + inward.y * 11;
+              const a = pts[el.wallIndex];
+              const b = pts[(el.wallIndex + 1) % pts.length];
+              angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+            } else {
+              px = el.x ?? 0;
+              py = el.y ?? 0;
+            }
+            const sym = electroSymbol(el.kind, px, py, angle);
+            return (
+              <g
+                key={el.id}
+                style={{ cursor: tool === 'select' ? 'pointer' : 'default' }}
+                onPointerDown={(e) => {
+                  if (tool !== 'select') return;
+                  e.stopPropagation();
+                  commit((_fp, _h, r) => {
+                    const v = r.variants.find((x) => x.id === r.activeVariantId);
+                    if (v) v.electro = (v.electro ?? []).filter((x) => x.id !== el.id);
+                  });
+                }}
+                data-testid={`electro-${el.id}`}
+              >
+                {sym.map((l, i) => (
+                  <polyline
+                    key={i}
+                    points={l.pts.map((p) => `${tx(p.x)},${ty(p.y)}`).join(' ')}
+                    fill="none"
+                    stroke="#8C9C8A"
+                    strokeWidth={l.style === 'thin' ? 0.9 : 1.4}
+                  />
+                ))}
+              </g>
+            );
+          });
+        })()}
+
+        {/* Erweiterung 8 · T6: Notiz-Pins (intern; nie im Kunden-/Präsentationsmodus) */}
+        {internalAllowed && layers.pins && (room.pins ?? []).map((pin) => (
+          <g
+            key={pin.id}
+            style={{ cursor: 'pointer' }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              if (tool === 'select') setPinEdit(pin.id);
+            }}
+            data-testid={`pin-${pin.id}`}
+          >
+            <circle cx={tx(pin.x)} cy={ty(pin.y)} r={7} fill={PIN_COLORS[pin.category]} stroke="#0A0A0B" strokeWidth={0.8} opacity={pin.done ? 0.4 : 1} />
+            <text x={tx(pin.x)} y={ty(pin.y)} fill="#0A0A0B" fontSize={8} fontWeight={700} textAnchor="middle" dy={2.8} pointerEvents="none">
+              {pin.category.charAt(0).toUpperCase()}
+            </text>
+          </g>
+        ))}
 
         {/* W6: Raum-Etikett (Name · Fläche · Umfang), Doppelklick = umbenennen */}
         {(() => {
@@ -987,6 +1173,56 @@ export function PlanEditor({
           ⤢
         </button>
         <button
+          className={`px-2 py-1 text-[11px] border rounded inline-flex items-center gap-1 bg-surface ${tool === 'electro' ? 'border-gold text-gold' : 'border-line text-muted hover:text-text'}`}
+          onClick={() => { setTool(tool === 'electro' ? 'select' : 'electro'); setPlacingTypeId(null); }}
+          title={t('electro.tool')}
+          data-testid="tool-electro"
+        >
+          <Zap size={11} /> {t('electro.tool')}
+        </button>
+        {tool === 'electro' && (
+          <select
+            className="field-input text-[10px] py-0.5 w-28"
+            value={electroKind}
+            onChange={(e) => setElectroKind(e.target.value as ElectroKind)}
+            data-testid="electro-kind"
+          >
+            {ELECTRO_KINDS.map((k) => (
+              <option key={k} value={k}>{ELECTRO_LABELS[k]}</option>
+            ))}
+          </select>
+        )}
+        <button
+          className={`px-2 py-1 text-[11px] border rounded inline-flex items-center gap-1 bg-surface ${tool === 'heat' ? 'border-gold text-gold' : 'border-line text-muted hover:text-text'}`}
+          onClick={() => { setTool(tool === 'heat' ? 'select' : 'heat'); setHeatDraw(tool === 'heat' ? null : []); }}
+          title={t('heat.tool')}
+          data-testid="tool-heat"
+        >
+          <Flame size={11} /> {t('heat.tool')}
+        </button>
+        {internalAllowed && (
+          <button
+            className={`px-2 py-1 text-[11px] border rounded inline-flex items-center gap-1 bg-surface ${tool === 'pin' ? 'border-gold text-gold' : 'border-line text-muted hover:text-text'}`}
+            onClick={() => setTool(tool === 'pin' ? 'select' : 'pin')}
+            title={t('pin.tool')}
+            data-testid="tool-pin"
+          >
+            <MapPin size={11} /> {t('pin.tool')}
+          </button>
+        )}
+        {tool === 'pin' && internalAllowed && (
+          <select
+            className="field-input text-[10px] py-0.5 w-24"
+            value={pinCat}
+            onChange={(e) => setPinCat(e.target.value as PinCategory)}
+            data-testid="pin-cat"
+          >
+            {PIN_CATEGORIES.map((c) => (
+              <option key={c} value={c}>{t(`pin.${c}`)}</option>
+            ))}
+          </select>
+        )}
+        <button
           className={`px-2 py-1 text-[11px] border rounded bg-surface ${showGrid ? 'border-gold text-gold' : 'border-line text-muted hover:text-text'}`}
           onClick={() => {
             if (showGrid && gridStep === 50) setGridStep(25);
@@ -1006,6 +1242,18 @@ export function PlanEditor({
         >
           ⊾
         </button>
+        {/* Ebenen-Schalter (Erweiterung 8 · T11) */}
+        {(['electro', 'heat', 'pins'] as const).map((ly) => (
+          <button
+            key={ly}
+            className={`px-1.5 py-1 text-[10px] border rounded bg-surface ${layers[ly] ? 'border-gold/60 text-gold' : 'border-line text-muted line-through'}`}
+            onClick={() => setLayers((s) => ({ ...s, [ly]: !s[ly] }))}
+            title={`${t('layers.title')}: ${t(`layers.${ly}`)}`}
+            data-testid={`layer-${ly}`}
+          >
+            {t(`layers.${ly}`)}
+          </button>
+        ))}
         <button
           className="px-2 py-1 text-[11px] border border-line rounded bg-surface text-muted hover:text-text"
           onClick={() => setShowHelp(true)}
@@ -1367,6 +1615,75 @@ export function PlanEditor({
                 {t('common.delete')}
               </button>
             </div>
+          </div>
+        );
+      })()}
+
+      {/* Erweiterung 8 · T6: Pin bearbeiten */}
+      {pinEdit && (() => {
+        const pin = (room.pins ?? []).find((p) => p.id === pinEdit);
+        if (!pin) return null;
+        const setPin = (fn: (p: PlanPin) => void) =>
+          commit((_fp, _h, r) => {
+            const target = (r.pins ?? []).find((p) => p.id === pinEdit);
+            if (target) fn(target);
+          });
+        return (
+          <div className="absolute bottom-1 left-1 right-1 bg-surface/97 border border-line rounded p-2.5 z-10" data-testid="pin-editor">
+            <div className="flex items-center gap-2 mb-1.5">
+              <select
+                className="field-input text-xs py-1 w-28"
+                value={pin.category}
+                onChange={(e) => setPin((p) => { p.category = e.target.value as PinCategory; })}
+              >
+                {PIN_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>{t(`pin.${c}`)}</option>
+                ))}
+              </select>
+              <label className="flex items-center gap-1 text-[10px] text-muted">
+                <input type="checkbox" checked={!!pin.done} onChange={(e) => setPin((p) => { p.done = e.target.checked; })} data-testid="pin-done" />
+                {t('pin.done')}
+              </label>
+              <label className="text-[10px] text-muted cursor-pointer underline">
+                {t('pin.photo')}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    compressImage(file, 800).then((dataUrl) => setPin((p) => { p.photo = dataUrl; }));
+                  }}
+                  data-testid="pin-photo-input"
+                />
+              </label>
+              {pin.photo && <img src={pin.photo} alt="" className="h-8 w-8 object-cover rounded" />}
+              <button
+                className="text-muted hover:text-danger ml-auto"
+                onClick={() => {
+                  commit((_fp, _h, r) => { r.pins = (r.pins ?? []).filter((p) => p.id !== pinEdit); });
+                  setPinEdit(null);
+                }}
+                data-testid="pin-delete"
+              >
+                <X size={13} />
+              </button>
+            </div>
+            <input
+              className="field-input text-xs py-1"
+              autoFocus
+              placeholder={t('pin.textPlaceholder')}
+              defaultValue={pin.text}
+              onBlur={(e) => setPin((p) => { p.text = e.target.value; })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setPin((p) => { p.text = (e.target as HTMLInputElement).value; });
+                  setPinEdit(null);
+                }
+              }}
+              data-testid="pin-text"
+            />
           </div>
         );
       })()}
