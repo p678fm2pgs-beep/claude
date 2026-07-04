@@ -104,6 +104,22 @@ export function PlanEditor({
   const [cursorPos, setCursorPos] = useState<Point | null>(null);
   const northDrag = useRef(false);
   const [northLive, setNorthLive] = useState<number | null>(null);
+  // ── W8: Onboarding + Kürzel-Übersicht (einmalig, überspringbar) ──
+  const [showHelp, setShowHelp] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('haven.editorOnboarding7') === null;
+    } catch {
+      return false;
+    }
+  });
+  const dismissHelp = () => {
+    try {
+      localStorage.setItem('haven.editorOnboarding7', '1');
+    } catch {
+      /* Sitzung ohne Speicher */
+    }
+    setShowHelp(false);
+  };
 
   if (pts.length < 3) return null;
 
@@ -844,6 +860,14 @@ export function PlanEditor({
         >
           ⊾
         </button>
+        <button
+          className="px-2 py-1 text-[11px] border border-line rounded bg-surface text-muted hover:text-text"
+          onClick={() => setShowHelp(true)}
+          title={t('editor.help')}
+          data-testid="editor-help"
+        >
+          ?
+        </button>
         {(sessionMeasures.length > 0 || (plan.measurements ?? []).length > 0) && (
           <button
             className="px-2 py-1 text-[11px] border border-line rounded bg-surface text-muted hover:text-danger"
@@ -987,6 +1011,30 @@ export function PlanEditor({
           <button className="ml-2 text-muted hover:text-text" onClick={() => { setPlacing(null); setGhost(null); }} aria-label={t('common.cancel')}>
             <X size={10} />
           </button>
+        </div>
+      )}
+
+      {/* W8: Onboarding / Kürzel-Übersicht (überspringbar) */}
+      {showHelp && (
+        <div className="absolute inset-0 bg-black/70 flex items-center justify-center rounded z-10" data-testid="editor-onboarding">
+          <div className="card p-4 max-w-sm">
+            <p className="eyebrow mb-2">{t('editor.helpTitle')}</p>
+            <ul className="text-xs space-y-1.5 text-muted">
+              <li><span className="text-text">{t('editor.help1')}</span></li>
+              <li><span className="text-text">{t('editor.help2')}</span></li>
+              <li><span className="text-text">{t('editor.help3')}</span></li>
+              <li><span className="text-text">{t('editor.help4')}</span></li>
+              <li className="pt-1 border-t border-line">
+                <kbd className="text-gold">W</kbd> {t('editor.toolWall')} · <kbd className="text-gold">M</kbd> {t('editor.toolMeasure')} ·{' '}
+                <kbd className="text-gold">D</kbd> {t('editor.duplicate')} · <kbd className="text-gold">Entf</kbd> {t('common.delete')} ·{' '}
+                <kbd className="text-gold">Esc</kbd> {t('common.cancel')} · <kbd className="text-gold">Alt</kbd> {t('editor.helpFine')} ·{' '}
+                <kbd className="text-gold">Shift</kbd> {t('editor.helpFreeAngle')}
+              </li>
+            </ul>
+            <button className="btn btn-primary w-full mt-4 text-xs py-1.5" onClick={dismissHelp} data-testid="onboarding-dismiss">
+              {t('editor.helpOk')}
+            </button>
+          </div>
         </div>
       )}
 

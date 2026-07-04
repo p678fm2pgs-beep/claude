@@ -36,3 +36,13 @@
   die bestehende Öffnungsflächen-Logik; kein Sonderpfad in der Kalkulation).
 - Sandbox ohne Browser: W8-Demo/Screenshots als dokumentierte Grenze; Ersatz sind
   Unit- + Konsistenz-Tests über die gesamte neue Geometrie-Logik.
+
+## Erweiterung 7 — weitere Entscheidungen (W2–W8)
+- Exakte Längeneingabe im Wand-Werkzeug: Eingaben ≤ 20 = Meter, > 20 = cm (kein Einheiten-Dropdown nötig).
+- „Wand löschen" (Umriss) = Eckpunkt entfernen/Wände verschmelzen — im Ein-Polygon-Modell die
+  einzig konsistente Deutung; enthaltene Öffnungen werden nach Dialog mit entfernt.
+- Raumteilung setzt wandgebundene Zuordnungen (wallColors/wallIndex/Licht-Wände) zurück,
+  weil sich Wandindizes beider Teilräume ändern — ehrlicher als stilles Falsch-Zuordnen.
+- Undo-Snapshots enthalten seit W5 auch die Varianten (Remap-Operationen sauber rückgängig);
+  Raumteilung selbst ist bewusst NICHT im Editor-Undo (Projekt-Ebene) — Rückweg: Raum löschen.
+- Onboarding/Kürzel als überspringbares Overlay statt Tour-Framework (offline, 0 Abhängigkeiten).
