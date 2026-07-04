@@ -6,6 +6,7 @@ import { computeWallPanels } from '../lib/room3d';
 import { computeOpeningParts, type OpeningPartKind } from '../lib/openings3d';
 import { fillFloorSurface } from '../lib/texture';
 import { resolveFloorSelection, resolveMaterial, resolveWallColorHex } from '../lib/materialResolve';
+import { findFurnitureType } from '../data/furniture';
 import { useT } from '../hooks';
 
 /**
@@ -263,6 +264,85 @@ export function Room3D({
       scene.add(mesh);
     }
 
+    // ── Einrichtung (Erweiterung 8 · T1/T2): parametrische Körper ──
+    const flames: { mesh: THREE.Mesh; base: number }[] = [];
+    for (const po of variant.placed ?? []) {
+      const ft = findFurnitureType(po.typeId);
+      const cat = ft?.place?.category ?? 'sonstig';
+      const w = Math.max(0.02, po.widthCm / 100);
+      const d = Math.max(0.02, po.depthCm / 100);
+      const h = Math.max(0.01, po.heightCm / 100);
+      const cxp = mapX(po.x);
+      const czp = mapZ(po.y);
+      const ry = (-po.rotationDeg * Math.PI) / 180;
+      const grp = new THREE.Group();
+      grp.position.set(cxp, 0, czp);
+      grp.rotation.y = ry;
+
+      const bodyColor =
+        po.bestand ? '#B7BDB2' :
+        cat === 'teppich' ? '#C9BCA6' :
+        cat === 'kamin' ? '#2C2A28' :
+        cat === 'heizkoerper' ? '#EDEAE2' :
+        cat === 'spiegel' ? '#AEC2CC' :
+        cat === 'kueche' ? '#3A3B3D' :
+        cat === 'treppe' ? '#9C7B4E' :
+        cat === 'bett' ? '#D8D2C6' :
+        cat === 'sofa' ? '#8A8577' :
+        cat === 'bad' ? '#EDEFF0' : '#B49A78';
+
+      const addBox = (bw: number, bh: number, bd: number, py: number, color: string, opts?: { rough?: number; metal?: number; emissive?: string; emissiveInt?: number; px?: number; pz?: number }) => {
+        const geo = new THREE.BoxGeometry(bw, bh, bd);
+        disposables.push(geo);
+        const mat = new THREE.MeshStandardMaterial({
+          color, roughness: opts?.rough ?? 0.7, metalness: opts?.metal ?? 0,
+          ...(opts?.emissive ? { emissive: new THREE.Color(opts.emissive), emissiveIntensity: opts.emissiveInt ?? 0.4 } : {}),
+        });
+        disposables.push(mat);
+        const m = new THREE.Mesh(geo, mat);
+        m.position.set(opts?.px ?? 0, py, opts?.pz ?? 0);
+        m.castShadow = cat !== 'teppich';
+        m.receiveShadow = true;
+        grp.add(m);
+        return { m, mat };
+      };
+
+      if (cat === 'teppich') {
+        addBox(w, 0.012, d, 0.006, bodyColor, { rough: 0.95 });
+      } else if (cat === 'sofa') {
+        addBox(w, h * 0.45, d, h * 0.22, bodyColor);
+        addBox(w, h * 0.55, d * 0.22, h * 0.5, bodyColor, { pz: -d / 2 + d * 0.11 });
+      } else if (cat === 'bett') {
+        addBox(w, h * 0.35, d, h * 0.18, bodyColor);
+        addBox(w, h * 0.45, d * 0.08, h * 0.4, '#B8B2A6', { pz: -d / 2 + d * 0.04 });
+      } else if (cat === 'schrank' || cat === 'kueche') {
+        addBox(w, h, d, h / 2, bodyColor, { rough: 0.55 });
+        if (cat === 'kueche') addBox(w, 0.04, d, h + 0.02, '#2A2A2C', { rough: 0.3 }); // Arbeitsplatte
+      } else if (cat === 'tisch') {
+        addBox(w, 0.04, d, h - 0.02, bodyColor, { rough: 0.4 });
+        for (const sx of [-w / 2 + 0.05, w / 2 - 0.05]) for (const sz of [-d / 2 + 0.05, d / 2 - 0.05]) addBox(0.05, h - 0.04, 0.05, (h - 0.04) / 2, bodyColor, { px: sx, pz: sz });
+      } else if (cat === 'kamin') {
+        addBox(w, h, d, h / 2, bodyColor, { rough: 0.6 });
+        // ruhiger, edler Flammen-Schimmer (kein Kitsch)
+        const f = addBox(w * 0.5, h * 0.4, d * 0.2, h * 0.35, '#C9722E', { emissive: '#E8843A', emissiveInt: 0.6, rough: 0.4, pz: d / 2 - d * 0.12 });
+        flames.push({ mesh: f.m, base: 0.6 });
+      } else if (cat === 'heizkoerper') {
+        addBox(w, h, Math.max(0.05, d), h / 2, bodyColor, { rough: 0.5, metal: 0.2 });
+      } else if (cat === 'spiegel') {
+        addBox(w, h, Math.max(0.02, d), h / 2, bodyColor, { rough: 0.05, metal: 0.4 });
+      } else if (cat === 'treppe') {
+        const steps = Math.max(3, Math.floor(w / 0.27));
+        for (let i = 0; i < steps; i++) {
+          addBox(w / steps, (h * (i + 1)) / steps, d, (h * (i + 1)) / steps / 2, bodyColor, { px: -w / 2 + (w / steps) * (i + 0.5), rough: 0.6 });
+        }
+      } else if (cat === 'bad') {
+        addBox(w, h, d, h / 2, bodyColor, { rough: 0.2, metal: 0.1 });
+      } else {
+        addBox(w, h, d, h / 2, bodyColor);
+      }
+      scene.add(grp);
+    }
+
     // ── Decke (S7e, einblendbar) ──
     if (showCeiling) {
       const ceilGeo = floorGeo.clone();
@@ -300,9 +380,18 @@ export function Room3D({
     }
 
     let raf = 0;
+    let frame = 0;
     const animate = () => {
       raf = requestAnimationFrame(animate);
       controls.update();
+      // Erweiterung 8: ruhiger Kamin-Schimmer (sanfte Sinus-Modulation, kein Kitsch).
+      if (flames.length > 0) {
+        frame++;
+        const flick = 0.85 + 0.15 * Math.sin(frame * 0.08) + 0.05 * Math.sin(frame * 0.21);
+        for (const f of flames) {
+          (f.mesh.material as THREE.MeshStandardMaterial).emissiveIntensity = f.base * flick;
+        }
+      }
       // S7e: Wände zwischen Kamera und Raum dezent ausblenden (freie Sicht im Orbit).
       for (const g of wallFade) {
         const toCam = new THREE.Vector3().subVectors(camera.position, g.center);

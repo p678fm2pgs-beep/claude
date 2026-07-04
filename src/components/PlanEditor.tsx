@@ -32,7 +32,10 @@ import {
 import { deriveAreas } from '../lib/geometry';
 import { useT } from '../hooks';
 import { uid } from '../lib/id';
-import { Copy, X, MousePointer2, PenLine, Ruler } from 'lucide-react';
+import { Copy, X, MousePointer2, PenLine, Ruler, Armchair } from 'lucide-react';
+import { ObjectLayer, placeObjectAt } from './ObjectLayer';
+import { FURNITURE_TYPES, findFurnitureType } from '../data/furniture';
+import type { PlacedObject } from '../types';
 
 const PAD = 30;
 const WALL_THICKNESSES = [11.5, 17.5, 24, 36.5];
@@ -104,6 +107,13 @@ export function PlanEditor({
   const [cursorPos, setCursorPos] = useState<Point | null>(null);
   const northDrag = useRef(false);
   const [northLive, setNorthLive] = useState<number | null>(null);
+  // ── Erweiterung 8 · T1/T2: Einrichtung ──
+  const [objSelId, setObjSelId] = useState<string | null>(null);
+  const [showObjDims, setShowObjDims] = useState(false);
+  const [placingTypeId, setPlacingTypeId] = useState<string | null>(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [paletteQuery, setPaletteQuery] = useState('');
+  const [polyDraw, setPolyDraw] = useState<Point[] | null>(null);
   // ── W8: Onboarding + Kürzel-Übersicht (einmalig, überspringbar) ──
   const [showHelp, setShowHelp] = useState<boolean>(() => {
     try {
@@ -314,6 +324,10 @@ export function PlanEditor({
       setDeleteAsk(null);
       setMeasureStart(null);
       setRenaming(null);
+      setObjSelId(null);
+      setPlacingTypeId(null);
+      setPaletteOpen(false);
+      setPolyDraw(null);
       return;
     }
     // W4: exakte Längeneingabe während des Ziehens (Ziffern + Enter)
@@ -335,7 +349,29 @@ export function PlanEditor({
         return;
       }
     }
-    if ((e.key === 'w' || e.key === 'W') && !wallStart) {
+    if ((e.key === 'Delete' || e.key === 'Backspace') && objSelId) {
+      commit((_fp, _h, r) => {
+        const v = r.variants.find((x) => x.id === r.activeVariantId);
+        if (v) v.placed = (v.placed ?? []).filter((o) => o.id !== objSelId);
+      });
+      setObjSelId(null);
+      return;
+    }
+    if ((e.key === 'd' || e.key === 'D') && objSelId) {
+      const src = room.variants.find((v) => v.id === room.activeVariantId)?.placed?.find((o) => o.id === objSelId);
+      if (src) {
+        const copy: PlacedObject = { ...JSON.parse(JSON.stringify(src)), id: uid('po'), x: src.x + 40, y: src.y + 40 };
+        commit((_fp, _h, r) => {
+          const v = r.variants.find((x) => x.id === r.activeVariantId);
+          if (v) v.placed = [...(v.placed ?? []), copy];
+        });
+        setObjSelId(copy.id);
+      }
+      return;
+    }
+    if ((e.key === 'e' || e.key === 'E') && !wallStart) {
+      setPaletteOpen((v) => !v);
+    } else if ((e.key === 'w' || e.key === 'W') && !wallStart) {
       setTool((tl) => (tl === 'wall' ? 'select' : 'wall'));
     } else if (e.key === 'm' || e.key === 'M') {
       setTool((tl) => (tl === 'measure' ? 'select' : 'measure'));
@@ -375,6 +411,26 @@ export function PlanEditor({
         onPointerUp={placing ? placeCopy : endDrag}
         onPointerLeave={endDrag}
         onPointerDown={(e) => {
+          // Erweiterung 8: Objekt platzieren / Sonderform zeichnen
+          if (placingTypeId) {
+            const at = toWorld(e);
+            const id = uid('po');
+            const obj = placeObjectAt(placingTypeId, at, id);
+            if (obj) {
+              commit((_fp, _h, r) => {
+                const v = r.variants.find((x) => x.id === r.activeVariantId);
+                if (!v) return;
+                v.placed = [...(v.placed ?? []), obj];
+              });
+              setObjSelId(id);
+            }
+            setPlacingTypeId(null);
+            return;
+          }
+          if (polyDraw) {
+            setPolyDraw([...polyDraw, toWorld(e)]);
+            return;
+          }
           if (tool === 'wall') {
             wallToolClick(e);
             return;
@@ -393,12 +449,37 @@ export function PlanEditor({
             setSelectedId(null);
             setEditing(null);
             setSelWall(null);
+            setObjSelId(null);
           }
         }}
         onDoubleClick={() => {
           if (tool === 'wall') {
             setWallStart(null);
             setLenBuf('');
+          }
+          // Sonderform schließen (≥3 Punkte)
+          if (polyDraw && polyDraw.length >= 3) {
+            const cx = polyDraw.reduce((s, p) => s + p.x, 0) / polyDraw.length;
+            const cy = polyDraw.reduce((s, p) => s + p.y, 0) / polyDraw.length;
+            const rel = polyDraw.map((p) => ({ x: Math.round(p.x - cx), y: Math.round(p.y - cy) }));
+            const b = {
+              w: Math.max(...rel.map((p) => p.x)) - Math.min(...rel.map((p) => p.x)),
+              d: Math.max(...rel.map((p) => p.y)) - Math.min(...rel.map((p) => p.y)),
+            };
+            const id = uid('po');
+            const obj: PlacedObject = {
+              id, typeId: 'custom', label: t('objects.customShape'),
+              x: Math.round(cx), y: Math.round(cy), rotationDeg: 0,
+              widthCm: Math.max(20, b.w), depthCm: Math.max(20, b.d), heightCm: 75,
+              shape: 'poly', poly: rel, tier: 'premium',
+            };
+            commit((_fp, _h, r) => {
+              const v = r.variants.find((x) => x.id === r.activeVariantId);
+              if (!v) return;
+              v.placed = [...(v.placed ?? []), obj];
+            });
+            setPolyDraw(null);
+            setObjSelId(id);
           }
         }}
         data-testid="floorplan-svg"
@@ -682,6 +763,51 @@ export function PlanEditor({
           );
         })}
 
+        {/* Erweiterung 8: Einrichtung (Teppiche unter Möbeln) */}
+        {(() => {
+          const variant = room.variants.find((v) => v.id === room.activeVariantId);
+          if (!variant) return null;
+          return (
+            <ObjectLayer
+              room={room}
+              variant={variant}
+              commit={commit}
+              tx={tx}
+              ty={ty}
+              toWorld={toWorld}
+              scale={scale}
+              selectedId={objSelId}
+              setSelectedId={(id) => {
+                setObjSelId(id);
+                if (id) {
+                  setSelectedId(null);
+                  setSelWall(null);
+                }
+              }}
+              showDims={showObjDims}
+              cursorPos={cursorPos}
+              placingTypeId={placingTypeId}
+              interactive={tool === 'select' && !placingTypeId && !polyDraw}
+            />
+          );
+        })()}
+
+        {/* Erweiterung 8: Sonderform-Vorschau */}
+        {polyDraw && polyDraw.length > 0 && (
+          <g data-testid="poly-draw">
+            <polyline
+              points={[...polyDraw, ...(cursorPos ? [cursorPos] : [])].map((p) => `${tx(p.x)},${ty(p.y)}`).join(' ')}
+              fill="rgba(201,168,76,0.08)"
+              stroke="#C9A84C"
+              strokeWidth={1.5}
+              strokeDasharray="5 3"
+            />
+            {polyDraw.map((p, i) => (
+              <circle key={i} cx={tx(p.x)} cy={ty(p.y)} r={3} fill="#C9A84C" />
+            ))}
+          </g>
+        )}
+
         {/* W6: Raum-Etikett (Name · Fläche · Umfang), Doppelklick = umbenennen */}
         {(() => {
           const c = polygonCentroid(pts);
@@ -840,6 +966,26 @@ export function PlanEditor({
             {measureStart ? t('editor.measureHint2') : t('editor.measureHint1')}
           </span>
         )}
+        <button
+          className={`px-2 py-1 text-[11px] border rounded inline-flex items-center gap-1 bg-surface ${paletteOpen || placingTypeId ? 'border-gold text-gold' : 'border-line text-muted hover:text-text'}`}
+          onClick={() => {
+            setPaletteOpen((v) => !v);
+            setPlacingTypeId(null);
+            setPolyDraw(null);
+          }}
+          title={`${t('objects.tool')} (E)`}
+          data-testid="tool-objects"
+        >
+          <Armchair size={11} /> {t('objects.tool')}
+        </button>
+        <button
+          className={`px-2 py-1 text-[11px] border rounded bg-surface ${showObjDims ? 'border-gold text-gold' : 'border-line text-muted hover:text-text'}`}
+          onClick={() => setShowObjDims((v) => !v)}
+          title={t('objects.showDims')}
+          data-testid="toggle-obj-dims"
+        >
+          ⤢
+        </button>
         <button
           className={`px-2 py-1 text-[11px] border rounded bg-surface ${showGrid ? 'border-gold text-gold' : 'border-line text-muted hover:text-text'}`}
           onClick={() => {
@@ -1014,6 +1160,217 @@ export function PlanEditor({
         </div>
       )}
 
+      {/* Erweiterung 8: Einrichtungs-Palette */}
+      {paletteOpen && (
+        <div className="absolute top-8 left-1 bg-surface/95 border border-line rounded p-2 w-56 max-h-72 overflow-y-auto z-10" data-testid="object-palette">
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-[11px] font-medium">{t('objects.palette')}</p>
+            <button className="text-muted hover:text-text" onClick={() => setPaletteOpen(false)} aria-label={t('common.cancel')}>
+              <X size={12} />
+            </button>
+          </div>
+          <input
+            className="field-input text-xs py-1 mb-1.5"
+            placeholder={t('objects.search')}
+            value={paletteQuery}
+            onChange={(e) => setPaletteQuery(e.target.value)}
+            data-testid="palette-search"
+          />
+          <button
+            className="w-full text-left px-2 py-1 text-[11px] text-gold hover:bg-gold-soft rounded"
+            onClick={() => {
+              setPolyDraw([]);
+              setPaletteOpen(false);
+            }}
+            data-testid="palette-customshape"
+          >
+            ✎ {t('objects.drawCustom')}
+          </button>
+          {FURNITURE_TYPES.filter(
+            (f) =>
+              f.place &&
+              (f.rooms.includes(room.type) || paletteQuery.length > 1) &&
+              (paletteQuery === '' || f.name.toLowerCase().includes(paletteQuery.toLowerCase())),
+          ).map((f) => (
+            <button
+              key={f.id}
+              className="w-full text-left px-2 py-1 text-[11px] text-muted hover:text-text hover:bg-gold-soft rounded"
+              onClick={() => {
+                setPlacingTypeId(f.id);
+                setPaletteOpen(false);
+              }}
+              data-testid={`palette-${f.id}`}
+            >
+              {f.name}
+              <span className="opacity-60"> · {f.place!.defaultW}×{f.place!.defaultD}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {placingTypeId && (
+        <div className="absolute top-1 left-40 text-[11px] text-gold bg-surface/90 border border-line rounded px-2 py-1" data-testid="object-placing-hint">
+          {t('objects.placeHint')}
+        </div>
+      )}
+      {polyDraw && (
+        <div className="absolute top-1 left-40 text-[11px] text-gold bg-surface/90 border border-line rounded px-2 py-1" data-testid="poly-hint">
+          {t('objects.polyHint')}
+        </div>
+      )}
+
+      {/* Erweiterung 8: Objekt-Eigenschaften */}
+      {objSelId && (() => {
+        const variant = room.variants.find((v) => v.id === room.activeVariantId);
+        const o = variant?.placed?.find((x) => x.id === objSelId);
+        if (!o) return null;
+        const ft = findFurnitureType(o.typeId);
+        const meta = ft?.place;
+        const setObj = (fn: (obj: PlacedObject) => void) =>
+          commit((_fp, _h, r) => {
+            const v = r.variants.find((x) => x.id === r.activeVariantId);
+            const target = v?.placed?.find((x) => x.id === objSelId);
+            if (target) fn(target);
+          });
+        const dimInput = (label: string, value: number, set: (v: number) => void, min: number, max: number, testid: string) => (
+          <label className="block text-[10px] text-muted">
+            {label} (cm)
+            <input
+              className="field-input text-xs mt-0.5 py-1"
+              defaultValue={Math.round(value)}
+              key={`${objSelId}-${label}-${Math.round(value)}`}
+              onBlur={(e) => {
+                const v = Number(e.target.value.replace(',', '.'));
+                if (Number.isFinite(v)) set(Math.max(min, Math.min(max, Math.round(v))));
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+              }}
+              inputMode="numeric"
+              data-testid={testid}
+            />
+          </label>
+        );
+        return (
+          <div className="absolute top-8 right-1 bg-surface/95 border border-line rounded p-2.5 w-56 space-y-2 z-10 max-h-80 overflow-y-auto" data-testid="object-panel">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-medium truncate">{o.label ?? ft?.name ?? o.typeId}</p>
+              <button className="text-muted hover:text-text" onClick={() => setObjSelId(null)} aria-label={t('common.cancel')}>
+                <X size={12} />
+              </button>
+            </div>
+            {meta?.hintTag === 'kamin' && <p className="text-[9px] text-warn">{t('objects.hintKamin')}</p>}
+            {meta?.hintTag === 'treppe' && <p className="text-[9px] text-warn">{t('objects.hintTreppe')}</p>}
+            <div className="grid grid-cols-3 gap-1.5">
+              {dimInput(t('rooms.width'), o.widthCm, (v) => setObj((x) => { x.widthCm = v; }), meta?.minW ?? 10, meta?.maxW ?? 800, 'obj-w')}
+              {dimInput(t('objects.depth'), o.depthCm, (v) => setObj((x) => { x.depthCm = v; }), meta?.minD ?? 10, meta?.maxD ?? 800, 'obj-d')}
+              {dimInput(t('rooms.height'), o.heightCm, (v) => setObj((x) => { x.heightCm = v; }), 1, 350, 'obj-h')}
+            </div>
+            {meta?.quickW && (
+              <div className="flex flex-wrap gap-1">
+                {meta.quickW.map((qw) => (
+                  <button
+                    key={qw}
+                    className={`px-1.5 py-0.5 text-[10px] border rounded ${Math.abs(o.widthCm - qw) < 0.5 ? 'border-gold text-gold' : 'border-line text-muted hover:text-text'}`}
+                    onClick={() => setObj((x) => { x.widthCm = qw; })}
+                    data-testid={`obj-quick-${qw}`}
+                  >
+                    {qw}
+                  </button>
+                ))}
+              </div>
+            )}
+            {meta && meta.shapes.length > 1 && (
+              <select
+                className="field-input text-xs py-1"
+                value={o.shape}
+                onChange={(e) => setObj((x) => {
+                  x.shape = e.target.value as PlacedObject['shape'];
+                  if (x.shape === 'lform' && !x.l2) x.l2 = { widthCm: Math.round(x.depthCm), depthCm: Math.round(x.depthCm * 1.2) };
+                })}
+                data-testid="obj-shape"
+              >
+                {meta.shapes.map((s) => (
+                  <option key={s} value={s}>{t(`shape.${s}`)}</option>
+                ))}
+              </select>
+            )}
+            {o.shape === 'lform' && (
+              <div className="grid grid-cols-2 gap-1.5">
+                {dimInput(t('objects.l2w'), o.l2?.widthCm ?? o.depthCm, (v) => setObj((x) => { x.l2 = { widthCm: v, depthCm: x.l2?.depthCm ?? x.depthCm }; }), 20, 400, 'obj-l2w')}
+                {dimInput(t('objects.l2d'), o.l2?.depthCm ?? o.depthCm, (v) => setObj((x) => { x.l2 = { widthCm: x.l2?.widthCm ?? x.depthCm, depthCm: v }; }), 20, 400, 'obj-l2d')}
+              </div>
+            )}
+            {ft?.id.startsWith('kueche') || ft?.id === 'kochinsel' || ft?.id === 'theke' ? (
+              <KitchenSegments o={o} setObj={setObj} t={t} />
+            ) : null}
+            <div className="flex items-center gap-1.5">
+              <label className="text-[10px] text-muted flex-1">
+                {t('objects.rotation')}
+                <input
+                  className="field-input text-xs mt-0.5 py-1"
+                  key={`${objSelId}-rot-${o.rotationDeg}`}
+                  defaultValue={Math.round(o.rotationDeg)}
+                  onBlur={(e) => {
+                    const v = Number(e.target.value);
+                    if (Number.isFinite(v)) setObj((x) => { x.rotationDeg = ((Math.round(v) % 360) + 360) % 360; });
+                  }}
+                  inputMode="numeric"
+                  data-testid="obj-rot"
+                />
+              </label>
+              <select
+                className="field-input text-xs py-1 w-24 mt-3"
+                value={o.tier}
+                onChange={(e) => setObj((x) => { x.tier = e.target.value as PlacedObject['tier']; })}
+                data-testid="obj-tier"
+              >
+                {(['standard', 'premium', 'luxus'] as const).map((tr) => (
+                  <option key={tr} value={tr}>{t(`common.tier.${tr}`)}</option>
+                ))}
+              </select>
+            </div>
+            <label className="flex items-center gap-1.5 text-[10px] text-muted cursor-pointer">
+              <input
+                type="checkbox"
+                checked={!!o.bestand}
+                onChange={(e) => setObj((x) => { x.bestand = e.target.checked; })}
+                data-testid="obj-bestand"
+              />
+              {t('objects.bestand')}
+            </label>
+            <div className="flex gap-1.5">
+              <button
+                className="btn btn-ghost flex-1 text-[11px] py-1"
+                onClick={() => {
+                  const copy: PlacedObject = { ...JSON.parse(JSON.stringify(o)), id: uid('po'), x: o.x + 40, y: o.y + 40 };
+                  commit((_fp, _h, r) => {
+                    const v = r.variants.find((x) => x.id === r.activeVariantId);
+                    if (v) v.placed = [...(v.placed ?? []), copy];
+                  });
+                  setObjSelId(copy.id);
+                }}
+                data-testid="obj-duplicate"
+              >
+                <Copy size={11} /> {t('editor.duplicate')}
+              </button>
+              <button
+                className="btn btn-danger flex-1 text-[11px] py-1"
+                onClick={() => {
+                  commit((_fp, _h, r) => {
+                    const v = r.variants.find((x) => x.id === r.activeVariantId);
+                    if (v) v.placed = (v.placed ?? []).filter((x) => x.id !== objSelId);
+                  });
+                  setObjSelId(null);
+                }}
+                data-testid="obj-delete"
+              >
+                {t('common.delete')}
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* W8: Onboarding / Kürzel-Übersicht (überspringbar) */}
       {showHelp && (
         <div className="absolute inset-0 bg-black/70 flex items-center justify-center rounded z-10" data-testid="editor-onboarding">
@@ -1119,6 +1476,48 @@ export function PlanEditor({
           />
         </div>
       )}
+    </div>
+  );
+}
+
+/** Küchen-Baukasten Stufe 2: Segmente der Zeile belegen (Erweiterung 8 · T2). */
+function KitchenSegments({
+  o, setObj, t,
+}: {
+  o: PlacedObject;
+  setObj: (fn: (obj: PlacedObject) => void) => void;
+  t: (k: string) => string;
+}) {
+  const KINDS = ['spuele', 'kochfeld', 'backofen', 'kuehlschrank', 'geschirrspueler', 'dunstabzug'] as const;
+  const segCount = Math.max(1, Math.floor(o.widthCm / 60));
+  return (
+    <div data-testid="kitchen-segments">
+      <p className="text-[10px] text-muted mb-1">{t('objects.segments')} (60-cm-Raster)</p>
+      <div className="flex flex-wrap gap-1">
+        {Array.from({ length: segCount }, (_, i) => {
+          const posCm = i * 60;
+          const current = (o.segments ?? []).find((s) => s.posCm === posCm)?.kind;
+          return (
+            <select
+              key={i}
+              className={`field-input text-[10px] py-0.5 w-[70px] ${current ? 'border-gold' : ''}`}
+              value={current ?? ''}
+              onChange={(e) => setObj((x) => {
+                const rest = (x.segments ?? []).filter((s) => s.posCm !== posCm);
+                x.segments = e.target.value
+                  ? [...rest, { posCm, kind: e.target.value as (typeof KINDS)[number] }]
+                  : rest;
+              })}
+              data-testid={`kitchen-seg-${i}`}
+            >
+              <option value="">–</option>
+              {KINDS.map((k) => (
+                <option key={k} value={k}>{t(`segment.${k}`)}</option>
+              ))}
+            </select>
+          );
+        })}
+      </div>
     </div>
   );
 }
