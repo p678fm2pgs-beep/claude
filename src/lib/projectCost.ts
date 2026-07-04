@@ -25,6 +25,7 @@ import { deriveAreas, netWallAreaForWallM2, skirtingLengthM, round2 } from './ge
 import { findMaterial, type Material } from '../data/materials';
 import { findAddon, type Addon } from '../data/addons';
 import { findFurnitureType } from '../data/furniture';
+import { placedQuantity, footprintAreaM2 } from './objects';
 import { findTrade } from '../data/prices';
 import { findFixture } from '../data/lighting';
 import {
@@ -78,6 +79,21 @@ function lineId(): string {
 }
 
 /** Baut alle Kostenzeilen eines Raumes (aktive Variante). */
+/** (Erweiterung 8 · T3) Anzeigenamen der Elektro-Symbole für die Mengenliste. */
+export const ELECTRO_LABELS: Record<string, string> = {
+  steckdose1: 'Steckdose 1er',
+  steckdose2: 'Steckdose 2er',
+  steckdose3: 'Steckdose 3er',
+  schalter: 'Schalter einfach',
+  wechsel: 'Wechselschalter',
+  doppel: 'Doppelschalter',
+  deckenauslass: 'Deckenauslass',
+  wandauslass: 'Wandauslass',
+  netzwerk: 'Netzwerk-Dose',
+  tv: 'TV-Dose',
+  herd: 'Herdanschluss',
+};
+
 export function computeRoomCost(room: Room, coverage: number): RoomCost {
   lineSeq = 0;
   const variant = room.variants.find((v) => v.id === room.activeVariantId) ?? room.variants[0];
@@ -160,6 +176,78 @@ export function computeRoomCost(room: Room, coverage: number): RoomCost {
       ekMin,
       ekMax,
       tier: item.tier,
+    });
+  }
+
+  // (Erweiterung 8 · T2) Platzierte Einrichtung — eigene Positionen mit Maß im Namen.
+  // lfm-Typen zählen die Breite in Metern; Bestandsmöbel des Kunden zählen NIE.
+  for (const po of variant?.placed ?? []) {
+    if (po.bestand) continue;
+    const ft = findFurnitureType(po.typeId);
+    if (!ft) continue;
+    const qty = placedQuantity(po, ft.unit);
+    const [von, bis] = ft.price[po.tier];
+    const gewerk: Gewerk =
+      ft.place?.category === 'heizkoerper' ? 'heizung' : ft.place?.category === 'leuchte' ? 'leuchten' : 'moebel';
+    lines.push({
+      id: lineId(),
+      label: `${po.label ?? ft.name} (${Math.round(po.widthCm)}×${Math.round(po.depthCm)} cm)`,
+      gewerk,
+      qty,
+      unit: ft.unit,
+      unitMin: von,
+      unitMax: bis,
+      totalMin: round2(von * qty),
+      totalMax: round2(bis * qty),
+      ekMin: round2(von * qty * 0.6),
+      ekMax: round2(bis * qty * 0.6),
+      tier: po.tier,
+    });
+  }
+
+  // (Erweiterung 8 · T4) FBH-Zonen: gezeichnete Zonen-m² über die bestehende FBH-Position.
+  const zonesM2 = (variant?.heatZones ?? []).reduce((s, z) => s + footprintAreaM2(z.poly), 0);
+  if (zonesM2 > 0) {
+    const fbh = findTrade('fbh');
+    if (fbh) {
+      const [von, bis, ekVon, ekBis] = fbh.prices.premium;
+      const qty = round2(zonesM2);
+      lines.push({
+        id: lineId(),
+        label: `${fbh.name} (Zonen)`,
+        gewerk: fbh.gewerk,
+        qty,
+        unit: 'm²',
+        unitMin: von,
+        unitMax: bis,
+        totalMin: round2(von * qty),
+        totalMax: round2(bis * qty),
+        ekMin: round2(ekVon * qty),
+        ekMax: round2(ekBis * qty),
+        tier: 'premium',
+      });
+    }
+  }
+
+  // (Erweiterung 8 · T3) Elektro-Zähler: Stückzahlen je Art (Preise nur, wenn im
+  // Preis-Manager Positionen existieren — sonst ehrliche 0-Preise, reine Mengenliste).
+  const electroCounts = new Map<string, number>();
+  for (const e of variant?.electro ?? []) {
+    electroCounts.set(e.kind, (electroCounts.get(e.kind) ?? 0) + 1);
+  }
+  for (const [kind, count] of electroCounts) {
+    lines.push({
+      id: lineId(),
+      label: `Elektro: ${ELECTRO_LABELS[kind] ?? kind}`,
+      gewerk: 'elektro',
+      qty: count,
+      unit: 'Stk',
+      unitMin: 0,
+      unitMax: 0,
+      totalMin: 0,
+      totalMax: 0,
+      ekMin: 0,
+      ekMax: 0,
     });
   }
 

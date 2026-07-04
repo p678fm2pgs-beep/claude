@@ -3,7 +3,35 @@
  * Ohne Markennamen. Je Raumtyp passende Vorschlagsliste.
  * Preisklassen Standard/Premium/Luxus als VON–BIS-Spanne (VK).
  */
-import type { PriceTier, RoomType } from '../types';
+import type { ObjectShape, PriceTier, RoomType } from '../types';
+
+/** (Erweiterung 8) Platzierungs-Metadaten eines Katalogtyps — alle optional. */
+export interface PlacementMeta {
+  /** Kategorie für Symbol/3D/Filter. */
+  category:
+    | 'schrank' | 'sofa' | 'bett' | 'tisch' | 'stuhl' | 'sideboard' | 'tv'
+    | 'kueche' | 'bad' | 'kamin' | 'heizkoerper' | 'teppich' | 'spiegel'
+    | 'treppe' | 'leuchte' | 'sonstig';
+  /** Standardmaße B×T×H in cm. */
+  defaultW: number;
+  defaultD: number;
+  defaultH: number;
+  /** Grenzen fürs Skalieren. */
+  minW: number;
+  maxW: number;
+  minD: number;
+  maxD: number;
+  /** erlaubte Formen (erste = Standard). */
+  shapes: ObjectShape[];
+  /** Schnellmaße für die Breite (cm). */
+  quickW?: number[];
+  /** dockt an Wand (Entlang-der-Wand-Logik). */
+  wallDock?: boolean;
+  /** liegt als Ebene UNTER Möbeln. */
+  rugLayer?: boolean;
+  /** Hinweis-Tag (z. B. Kamin-Sicherheitsabstände, Treppen-Fachbetrieb). */
+  hintTag?: string;
+}
 
 export interface FurnitureType {
   id: string;
@@ -15,6 +43,8 @@ export interface FurnitureType {
   /** [von, bis] VK je Einheit. */
   price: Record<PriceTier, [number, number]>;
   rooms: RoomType[];
+  /** (Erweiterung 8, optional) Platzierungs-Metadaten. */
+  place?: PlacementMeta;
 }
 
 const F = (
@@ -84,6 +114,15 @@ export const FURNITURE_TYPES: FurnitureType[] = [
     standard: [150, 400], premium: [400, 1000], luxus: [1000, 3000],
   }),
 ];
+
+// ── Erweiterung 8 · T2: Katalog wächst (rein additiv) ──
+import { FURNITURE_PLUS, PLACEMENT_FOR_EXISTING } from './furniturePlus';
+
+for (const f of FURNITURE_TYPES) {
+  const meta = PLACEMENT_FOR_EXISTING[f.id];
+  if (meta && !f.place) f.place = meta;
+}
+FURNITURE_TYPES.push(...FURNITURE_PLUS);
 
 export function furnitureForRoom(roomType: RoomType): FurnitureType[] {
   return FURNITURE_TYPES.filter((f) => f.rooms.includes(roomType));
