@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-serif text-anthracite;
+    text-wrap: balance;
+  }
+
+  /* Gut sichtbarer Fokus-Indikator für die gesamte Tastaturbedienung (WCAG 2.4.7) */
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 3px solid #7c5320;
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+}
+
+@layer components {
+  .container-x {
+    @apply mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-5 py-3 text-base font-semibold transition-colors;
+    min-height: 44px; /* ausreichend große Touch-Ziele (WCAG 2.5.5) */
+  }
+  .btn-primary {
+    @apply btn bg-anthracite text-white hover:bg-anthracite-700;
+  }
+  .btn-accent {
+    @apply btn bg-bronze text-white hover:bg-[#6a4619];
+  }
+  .btn-outline {
+    @apply btn border border-anthracite/30 bg-transparent text-anthracite hover:bg-anthracite hover:text-white;
+  }
+  .link-text {
+    @apply text-bronze underline underline-offset-2 hover:text-[#6a4619];
+  }
+  .card {
+    @apply rounded-xl2 border border-line bg-surface shadow-sm;
+  }
+  .prose-page {
+    @apply max-w-prose space-y-4 leading-relaxed text-ink;
+  }
+  .prose-page h2 {
+    @apply mt-8 text-2xl;
+  }
+  .prose-page h3 {
+    @apply mt-6 text-xl;
+  }
+  .prose-page a {
+    @apply link-text;
+  }
+  .prose-page ul {
+    @apply list-disc space-y-1 pl-6;
+  }
+  .field-label {
+    @apply mb-1 block text-sm font-semibold text-ink;
+  }
+  .field-input {
+    @apply w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-ink placeholder:text-muted;
+    min-height: 44px;
+  }
+  .field-input[aria-invalid='true'] {
+    @apply border-red-600;
+  }
+}
+
+/* Skip-Link: bis Fokus visuell versteckt */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+}
+.skip-link:focus {
+  left: 1rem;
+  top: 1rem;
+  @apply rounded-lg bg-anthracite px-4 py-2 text-white;
+}
